@@ -74,65 +74,58 @@
 
 ## Introduction
 
-Styles are the conventions that govern our code. The term style is a bit of a
-misnomer, since these conventions cover far more than just source file
-formatting—gofmt handles that for us.
+Style (สไตล์) คือชุดของแนวทางปฏิบัติที่ใช้กำหนดรูปแบบการเขียนโค้ดของเรา
 
-The goal of this guide is to manage this complexity by describing in detail the
-Dos and Don'ts of writing Go code at Uber. These rules exist to keep the code
-base manageable while still allowing engineers to use Go language features
-productively.
+คำว่า style อาจฟังดูคลาดเคลื่อนอยู่บ้าง เพราะแนวทางปฏิบัติเหล่านี้ไม่ได้ครอบคลุมแค่เรื่องการจัดรูปแบบของไฟล์โค้ดเท่านั้น — ซึ่ง gofmt เป็นตัวที่จัดการเรื่องนี้ให้อยู่แล้ว
 
-This guide was originally created by [Prashant Varanasi](https://github.com/prashantv) and [Simon Newton](https://github.com/nomis52) as
-a way to bring some colleagues up to speed with using Go. Over the years it has
-been amended based on feedback from others.
+เป้าหมายของคู่มือนี้คือการจัดการกับความซับซ้อน โดยอธิบายรายละเอียดของสิ่งที่ควรทำและไม่ควรทำในการเขียนโค้ดภาษา Go ที่ Uber
 
-This documents idiomatic conventions in Go code that we follow at Uber. A lot
-of these are general guidelines for Go, while others extend upon external
-resources:
+กฎเหล่านี้มีไว้เพื่อช่วยให้ codebase สามารถจัดการได้ง่าย และในขณะเดียวกันก็ยังเปิดโอกาสให้วิศวกรสามารถใช้ฟีเจอร์ต่าง ๆ ของภาษา Go ได้อย่างมีประสิทธิภาพ
 
+คู่มือนี้ถูกสร้างขึ้นครั้งแรกโดย [Prashant Varanasi](https://github.com/prashantv) และ [Simon Newton](https://github.com/nomis52) โดยมีวัตถุประสงค์เพื่อช่วยให้เพื่อนร่วมงานบางคนเรียนรู้การใช้ภาษา Go ได้อย่างรวดเร็ว
+
+ตลอดหลายปีที่ผ่านมา คู่มือนี้ได้รับการปรับปรุงเพิ่มเติมตามข้อเสนอแนะจากผู้อื่น
+
+เอกสารนี้บันทึกแนวทางปฏิบัติตามแบบ idiomatic ของภาษา Go ที่เราใช้กันที่ Uber
+
+หลายข้อในนี้เป็นแนวทางทั่วไปของภาษา Go ส่วนบางข้อก็ขยายจากแหล่งข้อมูลภายนอก เช่น:
 1. [Effective Go](https://go.dev/doc/effective_go)
 2. [Go Common Mistakes](https://go.dev/wiki/CommonMistakes)
 3. [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments)
 
-We aim for the code samples to be accurate for the two most recent minor versions
-of Go [releases](https://go.dev/doc/devel/release).
+เราออกแบบตัวอย่างโค้ดในคู่มือนี้ให้สามารถใช้งานได้กับเวอร์ชันรองล่าสุด 2 รุ่นของภาษา Go [releases](https://go.dev/doc/devel/release)
 
-All code should be error-free when run through `golint` and `go vet`. We
-recommend setting up your editor to:
+โค้ดทั้งหมดควรจะไม่มีข้อผิดพลาดเมื่อรันผ่าน `golint` และ `go vet`
 
-- Run `goimports` on save
-- Run `golint` and `go vet` to check for errors
+เราขอแนะนำให้ตั้งค่า editor ของคุณให้สามารถ:
 
-You can find information in editor support for Go tools here:
+- เรียกใช้ `goimports` เมื่อบันทึกไฟล์
+- รัน `golint` และ `go vet` เพื่อตรวจสอบข้อผิดพลาด
+
+คุณสามารถดูข้อมูลเกี่ยวกับการรองรับเครื่องมือของ Go ใน editor ได้ที่:
 https://go.dev/wiki/IDEsAndTextEditorPlugins
 
 ## Guidelines
 
 ### Pointers to Interfaces
 
-You almost never need a pointer to an interface. You should be passing
-interfaces as values—the underlying data can still be a pointer.
+คุณแทบจะไม่เคยจำเป็นต้องใช้ พอยเตอร์ที่ชี้ไปยัง interface เลย โดยปกติควรส่งค่า interface เป็นแบบ value มากกว่า — เพราะข้อมูลภายในยังสามารถเป็นพอยเตอร์ได้อยู่แล้ว
 
-An interface is two fields:
+Interface ประกอบด้วย 2 ส่วนหลัก:
+1.	พอยเตอร์ที่ชี้ไปยังข้อมูลที่เฉพาะกับชนิดของ type (สามารถนึกภาพว่าเป็น “type”)
+2.	พอยเตอร์ของข้อมูล — ถ้าข้อมูลที่เก็บไว้เป็นพอยเตอร์ จะเก็บไว้โดยตรง
+      แต่ถ้าเป็นค่า (value) จะเก็บเป็นพอยเตอร์ที่ชี้ไปยังค่านั้นอีกที
 
-1. A pointer to some type-specific information. You can think of this as
-   "type."
-2. Data pointer. If the data stored is a pointer, it’s stored directly. If
-   the data stored is a value, then a pointer to the value is stored.
-
-If you want interface methods to modify the underlying data, you must use a
-pointer.
+ถ้าคุณต้องการให้ method ของ interface สามารถแก้ไขข้อมูลภายในได้จริง ๆ
+คุณจะต้องใช้พอยเตอร์กับข้อมูลภายในนั้น — ไม่ใช่ ใช้พอยเตอร์กับตัว interface
 
 ### Verify Interface Compliance
 
-Verify interface compliance at compile time where appropriate. This includes:
+ควรตรวจสอบการ implement interface ให้ถูกต้องตั้งแต่ compile time ตามความเหมาะสม ซึ่งรวมถึงกรณีต่อไปนี้
 
-- Exported types that are required to implement specific interfaces as part of
-  their API contract
-- Exported or unexported types that are part of a collection of types
-  implementing the same interface
-- Other cases where violating an interface would break users
+- type ที่เป็น exported ซึ่งจำเป็นต้อง implement interface ตาม API contract
+- type ที่เป็น exported หรือ unexported ซึ่งอยู่ในกลุ่มของหลาย ๆ type ที่ implement interface เดียวกัน
+- กรณีอื่น ๆ ที่การไม่ implement interface อย่างถูกต้องจะส่งผลกระทบต่อผู้ใช้งาน
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -174,12 +167,12 @@ func (h *Handler) ServeHTTP(
 </td></tr>
 </tbody></table>
 
-The statement `var _ http.Handler = (*Handler)(nil)` will fail to compile if
-`*Handler` ever stops matching the `http.Handler` interface.
+คำสั่ง `var _ http.Handler = (*Handler)(nil)`
+ใช้เพื่อยืนยันว่า `*Handler` implement interface `http.Handler` อย่างถูกต้อง หากในอนาคต `*Handler` ไม่สอดคล้องกับ interface นี้ คำสั่งนี้จะทำให้เกิด error ตอน compile
 
-The right hand side of the assignment should be the zero value of the asserted
-type. This is `nil` for pointer types (like `*Handler`), slices, and maps, and
-an empty struct for struct types.
+ค่าทางฝั่งขวาของ assignment ควรเป็นค่าเริ่มต้น (zero value) ของ type ที่จะใช้ตรวจสอบ
+ซึ่งถ้าเป็น pointer, slice หรือ map — ค่านั้นคือ `nil`
+แต่ถ้าเป็น struct ธรรมดา ควรใช้ struct ว่าง เช่น `struct{}{}`
 
 ```go
 type LogHandler struct {
@@ -199,10 +192,9 @@ func (h LogHandler) ServeHTTP(
 
 ### Receivers and Interfaces
 
-Methods with value receivers can be called on pointers as well as values.
-Methods with pointer receivers can only be called on pointers or [addressable values](https://go.dev/ref/spec#Method_values).
+เมธอดที่มี value receiver สามารถถูกเรียกใช้งานได้ทั้งกับตัวแปรแบบค่า (value) และพอยเตอร์ (pointer)
+ในขณะที่เมธอดที่มี pointer receiver จะสามารถถูกเรียกได้เฉพาะกับพอยเตอร์เท่านั้น หรือกับ [addressable values](https://go.dev/ref/spec#Method_values) (เช่น ตัวแปรที่สามารถนำไปอ้างอิงด้วย & ได้)
 
-For example,
 
 ```go
 type S struct {
@@ -217,31 +209,29 @@ func (s *S) Write(str string) {
   s.data = str
 }
 
-// We cannot get pointers to values stored in maps, because they are not
-// addressable values.
+// เราไม่สามารถใช้พอยเตอร์ชี้ไปยังค่าที่เก็บอยู่ใน map ได้ เพราะค่าที่อยู่ใน map 
+// ไม่ใช่ addressable values (ไม่สามารถใช้ & เพื่ออ้างอิงตำแหน่งหน่วยความจำของมันได้)
 sVals := map[int]S{1: {"A"}}
 
-// We can call Read on values stored in the map because Read
-// has a value receiver, which does not require the value to
-// be addressable.
+// อย่างไรก็ตาม เราสามารถเรียกใช้เมธอด Read กับค่าที่อยู่ใน map ได้
+// เพราะ Read มี value receiver ซึ่งไม่ต้องการให้ค่าที่ใช้งานเป็น addressable
 sVals[1].Read()
 
-// We cannot call Write on values stored in the map because Write
-// has a pointer receiver, and it's not possible to get a pointer
-// to a value stored in a map.
+// แต่เรา ไม่สามารถเรียกใช้เมธอด Write กับค่าที่อยู่ใน map ได้
+// เนื่องจาก Write มี pointer receiver และเราไม่สามารถสร้างพอยเตอร์จากค่าที่อยู่ใน map ได้โดยตรง
 //
 //  sVals[1].Write("test")
 
 sPtrs := map[int]*S{1: {"A"}}
 
-// You can call both Read and Write if the map stores pointers,
-// because pointers are intrinsically addressable.
+// หาก map เก็บ พอยเตอร์ เป็นค่า เช่น map[int]*SomeType
+// เราจะสามารถเรียกใช้ได้ทั้ง Read และ Write เพราะ พอยเตอร์เป็น addressable โดยธรรมชาติ
 sPtrs[1].Read()
 sPtrs[1].Write("test")
 ```
 
-Similarly, an interface can be satisfied by a pointer, even if the method has a
-value receiver.
+ในทำนองเดียวกัน interface ก็สามารถถูก implement โดย pointer ได้
+แม้ว่าเมธอดใน interface นั้นจะมี value receiver ก็ตาม
 
 ```go
 type F interface {
@@ -270,12 +260,12 @@ i = s2Ptr
 //   i = s2Val
 ```
 
-Effective Go has a good write up on [Pointers vs. Values](https://go.dev/doc/effective_go#pointers_vs_values).
+บทความ Effective Go มีคำอธิบายที่ดีเกี่ยวกับเรื่อง [Pointers vs. Values](https://go.dev/doc/effective_go#pointers_vs_values)
 
 ### Zero-value Mutexes are Valid
 
-The zero-value of `sync.Mutex` and `sync.RWMutex` is valid, so you almost
-never need a pointer to a mutex.
+ค่าเริ่มต้น (zero value) ของ `sync.Mutex` และ `sync.RWMutex` สามารถใช้งานได้เลยทันที
+ดังนั้นคุณแทบไม่จำเป็นต้องใช้ pointer ไปยัง mutex เหล่านี้เลย
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -297,8 +287,10 @@ mu.Lock()
 </td></tr>
 </tbody></table>
 
-If you use a struct by pointer, then the mutex should be a non-pointer field on
-it. Do not embed the mutex on the struct, even if the struct is not exported.
+ถ้าคุณใช้งาน struct ผ่าน pointer
+mutex ควรเป็นฟิลด์แบบไม่ใช้พอยเตอร์ (non-pointer) ภายใน struct นั้น
+
+อย่า embed mutex ลงไปใน struct โดยตรง ถึงแม้ว่า struct นั้นจะไม่ได้เป็น exported ก็ตาม
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -353,26 +345,24 @@ func (m *SMap) Get(k string) string {
 
 <tr><td>
 
-The `Mutex` field, and the `Lock` and `Unlock` methods are unintentionally part
-of the exported API of `SMap`.
-
+ฟิลด์ `Mutex` รวมถึงเมธอด `Lock` และ `Unlock` ได้กลายเป็นส่วนหนึ่งของ API ที่ถูก export โดยไม่ได้ตั้งใจ ของ `SMap`
 </td><td>
 
-The mutex and its methods are implementation details of `SMap` hidden from its
-callers.
+mutex และ method อย่าง `Lock()` / `Unlock()` ถือเป็น รายละเอียดภายใน (implementation detail) ของ `SMap`
+ซึ่งหมายความว่า คนที่เรียกใช้งาน (caller) ไม่ควรต้องรู้ หรือยุ่งกับมันโดยตรง
 
 </td></tr>
 </tbody></table>
 
 ### Copy Slices and Maps at Boundaries
 
-Slices and maps contain pointers to the underlying data so be wary of scenarios
-when they need to be copied.
+slice และ map มีพอยเตอร์ ที่ชี้ไปยังข้อมูลภายใน (underlying data)
+ดังนั้นควรระวังกรณีที่จำเป็นต้อง คัดลอกข้อมูล เพื่อป้องกันการเปลี่ยนแปลงที่ไม่ตั้งใจ
 
 #### Receiving Slices and Maps
 
-Keep in mind that users can modify a map or slice you received as an argument
-if you store a reference to it.
+อย่าลืมว่า ถ้าคุณรับ slice หรือ map มาเป็น argument แล้วเก็บ reference ไว้
+ผู้เรียก (caller) ยังสามารถเปลี่ยนแปลงข้อมูลนั้นได้ภายหลัง
 
 <table>
 <thead><tr><th>Bad</th> <th>Good</th></tr></thead>
@@ -416,8 +406,9 @@ trips[0] = ...
 
 #### Returning Slices and Maps
 
-Similarly, be wary of user modifications to maps or slices exposing internal
-state.
+ในทำนองเดียวกัน อย่าคืนค่า map หรือ slice โดยตรง จากภายใน struct
+โดยเฉพาะเมื่อมีการใช้ mutex ป้องกัน — เพราะข้อมูลเหล่านั้นอาจถูกแก้ไขจากภายนอกโดยไม่ตั้งใจ
+ควรคืนเป็นสำเนา (copy) แทน เพื่อปกป้องสถานะภายในของระบบ
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -438,8 +429,7 @@ func (s *Stats) Snapshot() map[string]int {
   return s.counters
 }
 
-// snapshot is no longer protected by the mutex, so any
-// access to the snapshot is subject to data races.
+// ตอนนี้ snapshot ไม่ถูกป้องกันอีกแล้ว ใครเข้ามาแก้พร้อมกันก็เกิด race ได้
 snapshot := stats.Snapshot()
 ```
 
@@ -462,7 +452,7 @@ func (s *Stats) Snapshot() map[string]int {
   return result
 }
 
-// Snapshot is now a copy.
+// snapshot ตอนนี้เป็นสำเนา (copy) ปลอดภัย ไม่มี race
 snapshot := stats.Snapshot()
 ```
 
@@ -471,7 +461,7 @@ snapshot := stats.Snapshot()
 
 ### Defer to Clean Up
 
-Use defer to clean up resources such as files and locks.
+ใช้ defer เพื่อจัดการ clean up กับ resource ที่ต้องถูกคืนค่า เช่นไฟล์ หรือ lock ต่าง ๆ
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -491,7 +481,7 @@ p.Unlock()
 
 return newCount
 
-// easy to miss unlocks due to multiple returns
+// มีโอกาศที่ทำให้เราลืมเรียก Unlock() ได้ง่าย เมื่อมีหลายจุดที่ return
 ```
 
 </td><td>
@@ -507,25 +497,38 @@ if p.count < 10 {
 p.count++
 return p.count
 
-// more readable
+// อ่านง่าย ปลอดภัยกว่า
 ```
 
 </td></tr>
 </tbody></table>
 
-Defer has an extremely small overhead and should be avoided only if you can
-prove that your function execution time is in the order of nanoseconds. The
-readability win of using defers is worth the miniscule cost of using them. This
-is especially true for larger methods that have more than simple memory
-accesses, where the other computations are more significant than the `defer`.
+defer มีค่า overhead (ต้นทุนการทำงานเพิ่มเติม) ที่น้อยมาก — จึงควรหลีกเลี่ยงการใช้ แต่จะใช้เฉพาะเมื่อคุณสามารถพิสูจน์ได้ว่าฟังก์ชันของคุณทำงานในระดับ nanoseconds เท่านั้น
+
+```text
+กล่าวคือ ถ้าฟังก์ชันเร็วมาก ๆ ในระดับ nano-second และถูกเรียกซ้ำบ่อย ๆ (high-performance critical path)
+การไม่ใช้ defer อาจช่วยให้ประหยัด performance ได้เล็กน้อย
+```
+แต่ในกรณีทั่วไป
+* การใช้ `defer` ช่วยให้โค้ด อ่านง่ายขึ้น และลดความผิดพลาดในการลืม cleanup
+* โดยเฉพาะในเมธอดที่มีความซับซ้อนมากกว่าแค่การเข้าถึงหน่วยความจำ (memory access)
+  เช่น มีการประมวลผล หรือเงื่อนไขหลายชั้น
 
 ### Channel Size is One or None
 
-Channels should usually have a size of one or be unbuffered. By default,
-channels are unbuffered and have a size of zero. Any other size
-must be subject to a high level of scrutiny. Consider how the size is
-determined, what prevents the channel from filling up under load and blocking
-writers, and what happens when this occurs.
+โดยทั่วไป channel ควรมีขนาด (buffer size) เป็น 1 หรือ ไม่มี buffer เลย (unbuffered)
+ตามค่าเริ่มต้น channel จะเป็นแบบ unbuffered ซึ่งหมายความว่ามีขนาดเท่ากับ ศูนย์ (0)
+หากคุณจะใช้ channel ที่มีขนาดมากกว่านั้น จำเป็นต้องพิจารณาให้ละเอียดและรอบคอบ (subject to a high level of scrutiny)
+ให้พิจารณาคำถามเหล่านี้
+* ขนาดของ channel ที่คุณเลือก มีเหตุผลอย่างไร?
+* มีอะไรรับประกันว่า channel จะไม่เต็ม เมื่อระบบทำงานภายใต้โหลดสูง?
+* ถ้า channel เต็มแล้ว จะเกิดอะไรขึ้น? เช่น จะ block ฝั่งเขียน (writer) หรือไม่?
+
+**สรุป:**
+
+การตั้งขนาด channel โดยไม่มีเหตุผลรองรับชัดเจน อาจนำไปสู่ bug ยาก ๆ ที่ตามหายากมากใน production
+ขนาด 1 หรือ unbuffered มักจะปลอดภัยและเข้าใจง่ายกว่า เว้นแต่คุณจะรู้ชัดว่าเหตุผลของ buffer ที่มากกว่านั้นคืออะไร.
+
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -533,16 +536,16 @@ writers, and what happens when this occurs.
 <tr><td>
 
 ```go
-// Ought to be enough for anybody!
+// คิดเอาเองว่าพอแน่ ๆ แต่ไม่มีเหตุผลรองรับ
 c := make(chan int, 64)
 ```
 
 </td><td>
 
 ```go
-// Size of one
+// Buffered channel ขนาด 1
 c := make(chan int, 1) // or
-// Unbuffered channel, size of zero
+// หรือใช้แบบไม่มี buffer (synchronous channel)
 c := make(chan int)
 ```
 
@@ -551,9 +554,8 @@ c := make(chan int)
 
 ### Start Enums at One
 
-The standard way of introducing enumerations in Go is to declare a custom type
-and a `const` group with `iota`. Since variables have a 0 default value, you
-should usually start your enums on a non-zero value.
+วิธีมาตรฐานในการสร้าง Enum ใน Go คือ  สร้าง ชนิดข้อมูลแบบกำหนดเอง (custom type) ตามด้วยการประกาศกลุ่ม `const` ที่ใช้ `iota` เพื่อเพิ่มค่าตัวเลขอัตโนมัติ
+แต่เนื่องจากตัวแปรใน Go มี ค่าเริ่มต้นเป็นศูนย์ (0) จึง ควรหลีกเลี่ยงการเริ่ม enum จากค่า 0 เว้นแต่คุณตั้งใจให้ 0 มีความหมายพิเศษ
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -564,12 +566,12 @@ should usually start your enums on a non-zero value.
 type Operation int
 
 const (
-  Add Operation = iota
-  Subtract
-  Multiply
+  Add Operation = iota      // 0
+  Subtract                  // 1
+  Multiply                  // 2
 )
 
-// Add=0, Subtract=1, Multiply=2
+// ปัญหา: Add มีค่าเท่ากับ 0 ซึ่งอาจเกิดความสับสนหรือ bug ได้หากลืมกำหนดค่าให้ตัวแปร
 ```
 
 </td><td>
@@ -578,55 +580,54 @@ const (
 type Operation int
 
 const (
-  Add Operation = iota + 1
-  Subtract
-  Multiply
+  Add Operation = iota + 1  // 1
+  Subtract                  // 2
+  Multiply                  // 3
 )
 
-// Add=1, Subtract=2, Multiply=3
+// ข้อดี: เริ่มจาก 1 ช่วยหลีกเลี่ยงการใช้ค่าดีฟอลต์ (0) โดยไม่ได้ตั้งใจ
 ```
 
 </td></tr>
 </tbody></table>
 
-There are cases where using the zero value makes sense, for example when the
-zero value case is the desirable default behavior.
+แม้จะมีคำแนะนำทั่วไปว่า ควรหลีกเลี่ยงการใช้ 0 เป็นค่าของ enum 
+แต่ก็มีบางกรณีที่ การใช้ค่า 0 เป็นค่าเริ่มต้นถือว่าเหมาะสม
+เช่น เมื่อค่าเริ่มต้นนั้นตรงกับพฤติกรรมที่ต้องการให้ระบบใช้งานโดยดีฟอลต์
 
 ```go
 type LogOutput int
 
 const (
-  LogToStdout LogOutput = iota
-  LogToFile
-  LogToRemote
+  LogToStdout LogOutput = iota  // 0
+  LogToFile                     // 1
+  LogToRemote                   // 2
 )
 
-// LogToStdout=0, LogToFile=1, LogToRemote=2
+// LogToStdout มีค่า 0 ซึ่งเป็นค่าดีฟอลต์ของชนิด LogOutput
 ```
 
 <!-- TODO: section on String methods for enums -->
 
 ### Use `"time"` to handle time
 
-Time is complicated. Incorrect assumptions often made about time include the
-following.
+เวลา (time) เป็นเรื่องซับซ้อน และมี ความเข้าใจผิดที่มักเกิดขึ้นบ่อย เช่น
 
-1. A day has 24 hours
-2. An hour has 60 minutes
-3. A week has 7 days
-4. A year has 365 days
+1. หนึ่งวันมี 24 ชั่วโมง
+2. หนึ่งชั่วโมงมี 60 นาที
+3. หนึ่งสัปดาห์มี 7 วัน
+4. หนึ่งปีมี 365 วัน
 5. [And a lot more](https://infiniteundo.com/post/25326999628/falsehoods-programmers-believe-about-time)
 
-For example, *1* means that adding 24 hours to a time instant will not always
-yield a new calendar day.
+ตัวอย่างเช่น **ข้อ 1** หมายความว่า การบวกเวลา 24 ชั่วโมงเข้าไป อาจ ไม่ได้ผลลัพธ์เป็นวันใหม่ตามปฏิทิน เสมอไป (เช่น ช่วงเปลี่ยนเวลาใน daylight saving)
 
-Therefore, always use the [`"time"`](https://pkg.go.dev/time) package when dealing with time because it
-helps deal with these incorrect assumptions in a safer, more accurate manner.
+ควรใช้แพ็กเกจ [`"time"`](https://pkg.go.dev/time) ของ Go ในการจัดการกับเวลาเสมอ
+เพราะมันช่วยจัดการกับความซับซ้อนเหล่านี้ได้อย่าง ปลอดภัยและแม่นยำ มากกว่าเขียนเองหรือใช้การคำนวณโดยตรง
 
 #### Use `time.Time` for instants of time
 
-Use [`time.Time`](https://pkg.go.dev/time#Time) when dealing with instants of time, and the methods on
-`time.Time` when comparing, adding, or subtracting time.
+ให้ใช้ [`time.Time`](https://pkg.go.dev/time#Time) และใช้ เมธอดของ `time.Time` เช่น Before, After, Equal, Add, Sub
+แทนที่จะใช้เลขจำนวนเต็ม (int) ซึ่งอาจก่อให้เกิดข้อผิดพลาดหรือความเข้าใจผิดได้ง่าย
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -652,7 +653,8 @@ func isActive(now, start, stop time.Time) bool {
 
 #### Use `time.Duration` for periods of time
 
-Use [`time.Duration`](https://pkg.go.dev/time#Duration) when dealing with periods of time.
+เมื่อจัดการกับ ช่วงเวลา (periods of time) เช่น ความยาวของเวลา หรือระยะเวลาที่ผ่านไป
+ให้ใช้ [`time.Duration`](https://pkg.go.dev/time#Duration) เสมอ
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -686,11 +688,9 @@ poll(10*time.Second)
 </td></tr>
 </tbody></table>
 
-Going back to the example of adding 24 hours to a time instant, the method we
-use to add time depends on intent. If we want the same time of the day, but on
-the next calendar day, we should use [`Time.AddDate`](https://pkg.go.dev/time#Time.AddDate). However, if we want an
-instant of time guaranteed to be 24 hours after the previous time, we should
-use [`Time.Add`](https://pkg.go.dev/time#Time.Add).
+กลับไปที่ตัวอย่างก่อนหน้าเรื่องการ บวกเวลา 24 ชั่วโมง กับเวลาหนึ่งจุด (time instant) — วิธีที่เราจะใช้ในการบวกเวลานั้นขึ้นอยู่กับ “เจตนา” ของเรา
+* ถ้าเราต้องการ เวลาเดิมของวันถัดไปในปฏิทิน (เช่น ตอนนี้คือ 9 โมงเช้าวันนี้ → อยากได้ 9 โมงเช้าวันพรุ่งนี้) ให้ใช้ [`Time.AddDate`](https://pkg.go.dev/time#Time.AddDate)
+* แต่ถ้าเราต้องการ เวลาที่ห่างจากเดิมไป 24 ชั่วโมงจริง ๆ (นับตามชั่วโมง ไม่ใช่วันปฏิทิน) ให้ใช้ [`Time.Add`](https://pkg.go.dev/time#Time.Add)
 
 ```go
 newDay := t.AddDate(0 /* years */, 0 /* months */, 1 /* days */)
@@ -699,23 +699,20 @@ maybeNewDay := t.Add(24 * time.Hour)
 
 #### Use `time.Time` and `time.Duration` with external systems
 
-Use `time.Duration` and `time.Time` in interactions with external systems when
-possible. For example:
+ควรใช้ `time.Time` และ `time.Duration` เมื่อต้องสื่อสารกับระบบภายนอก ถ้าเป็นไปได้ เช่น
 
-- Command-line flags: [`flag`](https://pkg.go.dev/flag) supports `time.Duration` via
+
+- Command-line flags: แพ็กเกจ [`flag`](https://pkg.go.dev/flag) รองรับ `time.Duration` ผ่านฟังก์ชัน
   [`time.ParseDuration`](https://pkg.go.dev/time#ParseDuration)
-- JSON: [`encoding/json`](https://pkg.go.dev/encoding/json) supports encoding `time.Time` as an [RFC 3339](https://tools.ietf.org/html/rfc3339)
-  string via its [`UnmarshalJSON` method](https://pkg.go.dev/time#Time.UnmarshalJSON)
-- SQL: [`database/sql`](https://pkg.go.dev/database/sql) supports converting `DATETIME` or `TIMESTAMP` columns
-  into `time.Time` and back if the underlying driver supports it
-- YAML: [`gopkg.in/yaml.v2`](https://pkg.go.dev/gopkg.in/yaml.v2) supports `time.Time` as an [RFC 3339](https://tools.ietf.org/html/rfc3339) string, and
-  `time.Duration` via [`time.ParseDuration`](https://pkg.go.dev/time#ParseDuration).
+- JSON: แพ็กเกจ [`encoding/json`](https://pkg.go.dev/encoding/json) รองรับการเข้ารหัส `time.Time` เป็น string ตาม [RFC 3339](https://tools.ietf.org/html/rfc3339)
+  ผ่านเมท็อด [`UnmarshalJSON`](https://pkg.go.dev/time#Time.UnmarshalJSON)
+- SQL: แพ็กเกจ [`database/sql`](https://pkg.go.dev/database/sql) รองรับการ map คอลัมน์ชนิด `DATETIME` หรือ `TIMESTAMP`
+  ให้กลายเป็น time.Time ได้ (ขึ้นอยู่กับว่า driver รองรับหรือไม่)
+- YAML: แพ็กเกจ [`gopkg.in/yaml.v2`](https://pkg.go.dev/gopkg.in/yaml.v2) รองรับ `time.Time` ในรูปแบบ string ตาม [RFC 3339](https://tools.ietf.org/html/rfc3339)
+  และ `time.Duration` ผ่าน `time.ParseDuration`
 
-When it is not possible to use `time.Duration` in these interactions, use
-`int` or `float64` and include the unit in the name of the field.
-
-For example, since `encoding/json` does not support `time.Duration`, the unit
-is included in the name of the field.
+แต่ในกรณีที่ ไม่สามารถใช้ `time.Duration` ได้โดยตรง (เช่น JSON ไม่รองรับ time.Duration)
+ควรใช้ `int` หรือ `float64` และตั้งชื่อฟิลด์ ให้ระบุหน่วยไว้ด้วย เพื่อป้องกันความสับสน
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -725,7 +722,7 @@ is included in the name of the field.
 ```go
 // {"interval": 2}
 type Config struct {
-  Interval int `json:"interval"`
+  Interval int `json:"interval"` // ไม่รู้ว่า 2 อะไร? วินาที? นาที?
 }
 ```
 
@@ -734,40 +731,32 @@ type Config struct {
 ```go
 // {"intervalMillis": 2000}
 type Config struct {
-  IntervalMillis int `json:"intervalMillis"`
+  IntervalMillis int `json:"intervalMillis"` // ชัดเจนว่าเป็นมิลลิวินาที
 }
 ```
 
 </td></tr>
 </tbody></table>
 
-When it is not possible to use `time.Time` in these interactions, unless an
-alternative is agreed upon, use `string` and format timestamps as defined in
-[RFC 3339](https://tools.ietf.org/html/rfc3339). This format is used by default by [`Time.UnmarshalText`](https://pkg.go.dev/time#Time.UnmarshalText) and is
-available for use in `Time.Format` and `time.Parse` via [`time.RFC3339`](https://pkg.go.dev/time#RFC3339).
+เมื่อไม่สามารถใช้ `time.Time` ได้ในการสื่อสารกับระบบภายนอก หากไม่สามารถใช้ `time.Time` ได้ และไม่มีข้อตกลงเฉพาะอื่นไว้ล่วงหน้า ให้ใช้ `string` และจัดรูปแบบเวลาเป็นไปตาม [RFC 3339](https://tools.ietf.org/html/rfc3339)
+* รูปแบบนี้เป็นค่าเริ่มต้นของเมท็อด [`Time.UnmarshalText`](https://pkg.go.dev/time#Time.UnmarshalText)
+* สามารถใช้งานร่วมกับ `Time.Format` และ `time.Parse` ได้โดยใช้คงที่ [`time.RFC3339`](https://pkg.go.dev/time#RFC3339)
 
-Although this tends to not be a problem in practice, keep in mind that the
-`"time"` package does not support parsing timestamps with leap seconds
-([8728](https://github.com/golang/go/issues/8728)), nor does it account for leap seconds in calculations ([15190](https://github.com/golang/go/issues/15190)). If
-you compare two instants of time, the difference will not include the leap
-seconds that may have occurred between those two instants.
+แม้ว่าส่วนใหญ่จะไม่มีปัญหาในทางปฏิบัติ แต่ควรทราบว่าแพ็กเกจ `"time"` ของ Go
+* ไม่รองรับการ parse เวลาที่มี leap second (วินาทีพิเศษที่เพิ่มเข้ามาในบางปี) ดูรายละเอียดที่ issue [#8728](https://github.com/golang/go/issues/8728)
+* ไม่รวม leap second ในการคำนวณเวลา เช่น การลบเวลาสองจุด จะไม่รวมวินาทีพิเศษที่อาจเกิดขึ้นระหว่างสองเวลานั้น ดูรายละเอียดที่ issue [#15190](https://github.com/golang/go/issues/15190)
 
 ### Errors
 
 #### Error Types
 
-There are few options for declaring errors.
-Consider the following before picking the option best suited for your use case.
+การประกาศ error ใน Go มีหลายวิธีให้เลือกใช้ก่อนเลือกวิธีที่เหมาะสมกับกรณีของคุณ ควรพิจารณาคำถามเหล่านี้ก่อน
 
-- Does the caller need to match the error so that they can handle it?
-  If yes, we must support the [`errors.Is`](https://pkg.go.dev/errors#Is) or [`errors.As`](https://pkg.go.dev/errors#As) functions
-  by declaring a top-level error variable or a custom type.
-- Is the error message a static string,
-  or is it a dynamic string that requires contextual information?
-  For the former, we can use [`errors.New`](https://pkg.go.dev/errors#New), but for the latter we must
-  use [`fmt.Errorf`](https://pkg.go.dev/fmt#Errorf) or a custom error type.
-- Are we propagating a new error returned by a downstream function?
-  If so, see the [section on error wrapping](#error-wrapping).
+- ผู้เรียก (caller) จำเป็นต้องตรวจสอบประเภทของ error เพื่อจัดการกับมันหรือไม่? ถ้าใช่ ควรซซัปพอร์ตการใช้งาน [`errors.Is`](https://pkg.go.dev/errors#Is) หรือ [`errors.As`](https://pkg.go.dev/errors#As)
+  ด้วยการประกาศตัวแปร error ไว้ระดับบน (top-level error variable) หรือใช้ custom error type
+- ข้อความของ error เป็นข้อความตายตัว (static) หรือมีข้อมูลบริบทแบบ dynamic? ถ้าเป็น ข้อความตายตัว ใช้ [`errors.New`](https://pkg.go.dev/errors#New) ได้ ถ้าเป็น ข้อความที่ต้องใส่ข้อมูลเพิ่มเติม เช่น ตัวแปรหรือ context ควรใช้
+  [`fmt.Errorf`](https://pkg.go.dev/fmt#Errorf) หรือสร้าง custom error type
+- เรากำลังส่งต่อ error จากฟังก์ชันข้างล่าง (downstream function) หรือไม่? ถ้าใช่ ดูหัวข้อถัดไปเกี่ยวกับ การห่อ error [error wrapping](#error-wrapping)
 
 | Error matching? | Error Message | Guidance                                                           |
 |-----------------|---------------|--------------------------------------------------------------------|
@@ -776,10 +765,9 @@ Consider the following before picking the option best suited for your use case.
 | Yes             | static        | top-level `var` with [`errors.New`](https://pkg.go.dev/errors#New) |
 | Yes             | dynamic       | custom `error` type                                                |
 
-For example,
-use [`errors.New`](https://pkg.go.dev/errors#New) for an error with a static string.
-Export this error as a variable to support matching it with `errors.Is`
-if the caller needs to match and handle this error.
+ตัวอย่างเช่น
+ใช้ [`errors.New`](https://pkg.go.dev/errors#New) เมื่อคุณต้องการสร้าง error ที่มีข้อความคงที่ (static string) หากผู้เรียก (caller) จำเป็นต้องดักและจัดการกับ error นี้
+ให้ export error นี้เป็นตัวแปร (ประกาศไว้ระดับ package) เพื่อให้สามารถใช้ `errors.Is` ตรวจสอบได้
 
 <table>
 <thead><tr><th>No error matching</th><th>Error matching</th></tr></thead>
@@ -826,9 +814,9 @@ if err := foo.Open(); err != nil {
 </td></tr>
 </tbody></table>
 
-For an error with a dynamic string,
-use [`fmt.Errorf`](https://pkg.go.dev/fmt#Errorf) if the caller does not need to match it,
-and a custom `error` if the caller does need to match it.
+หาก error มี ข้อความแบบ dynamic
+* ถ้า ไม่จำเป็นต้องดักชนิดของ error: ใช้ [`fmt.Errorf`](https://pkg.go.dev/fmt#Errorf)
+* ถ้า ต้องการให้ caller ดักและจัดการ error เฉพาะประเภท: สร้าง custom error type
 
 <table>
 <thead><tr><th>No error matching</th><th>Error matching</th></tr></thead>
@@ -873,7 +861,7 @@ func Open(file string) error {
 if err := foo.Open("testfile.txt"); err != nil {
   var notFound *NotFoundError
   if errors.As(err, &notFound) {
-    // handle the error
+    // ดักได้ว่าเป็น NotFoundError
   } else {
     panic("unknown error")
   }
@@ -883,43 +871,29 @@ if err := foo.Open("testfile.txt"); err != nil {
 </td></tr>
 </tbody></table>
 
-Note that if you export error variables or types from a package,
-they will become part of the public API of the package.
+เมื่อคุณ export error (เช่น `var ErrSomething = errors.New("...")` หรือ `type SomeError struct {...})` ตัวแปรหรือ type นั้นจะสามารถเข้าถึงได้จากภายนอก package — ซึ่งหมายความว่าโค้ดอื่นที่ import package นี้อาจพึ่งพา error เหล่านี้ ทำให้การเปลี่ยนแปลงภายหลังต้องทำอย่างระมัดระวัง เพราะจะมีผลกับผู้ใช้ package ของคุณด้วย (เช่น การลบหรือเปลี่ยน behavior ของ error เหล่านั้นอาจทำให้โค้ดของคนอื่นพัง)
 
 #### Error Wrapping
 
-There are three main options for propagating errors if a call fails:
+เมื่อเรียกฟังก์ชันแล้วเกิด error ขึ้น มีตัวเลือกหลัก ๆ 3 วิธีในการ propagate (ส่งต่อ) error เหล่านั้นออกไป:
 
-- return the original error as-is
-- add context with `fmt.Errorf` and the `%w` verb
-- add context with `fmt.Errorf` and the `%v` verb
+- คืนค่า error ต้นฉบับแบบไม่เปลี่ยนแปลง
+- เพิ่ม context ด้วย `fmt.Errorf` โดยใช้ `%w` (สำหรับการ wrap)
+- เพิ่ม context ด้วย `fmt.Errorf` โดยใช้ `%v` (ไม่สามารถตรวจจับชนิดเดิมได้)
 
-Return the original error as-is if there is no additional context to add.
-This maintains the original error type and message.
-This is well suited for cases when the underlying error message
-has sufficient information to track down where it came from.
+กรณีที่ควรคืนค่า error ต้นฉบับแบบไม่เปลี่ยนแปลง (return err ตรง ๆ)
+หากไม่มีข้อมูลเพิ่มเติมที่ต้องการใส่เพิ่มใน error — ควรคืน error เดิมแบบ as-is เพื่อรักษาชนิดและข้อความของ error เดิมไว้
+วิธีนี้เหมาะกับกรณีที่ข้อความ error จากต้นทาง (เช่น error จาก library หรือ function ด้านใน) มีข้อมูลเพียงพอสำหรับการแกะรอยและเข้าใจต้นตอของปัญหาอยู่แล้ว
 
-Otherwise, add context to the error message where possible
-so that instead of a vague error such as "connection refused",
-you get more useful errors such as "call service foo: connection refused".
+ถ้าไม่สามารถคืน error ต้นฉบับแบบเดิมได้ — ควรเพิ่ม context (บริบท) ให้กับข้อความ error เพื่อให้เข้าใจสาเหตุได้ง่ายขึ้น
+แทนที่จะได้ error ที่คลุมเครือ ตัวอย่างเช่นอย่างเช่น "connection refused" ควรแสดงข้อความที่มีบริบทมากขึ้น เช่น "call service foo: connection refused"
 
-Use `fmt.Errorf` to add context to your errors,
-picking between the `%w` or `%v` verbs
-based on whether the caller should be able to
-match and extract the underlying cause.
+ให้ใช้ `fmt.Errorf` เพื่อ เพิ่มบริบท (context) ให้กับ error ที่เกิดขึ้น โดยเลือกใช้ `%w` หรือ `%v` ตามวัตถุประสงค์ของการ "ดักจับ" error ภายหลัง:
 
-- Use `%w` if the caller should have access to the underlying error.
-  This is a good default for most wrapped errors,
-  but be aware that callers may begin to rely on this behavior.
-  So for cases where the wrapped error is a known `var` or type,
-  document and test it as part of your function's contract.
-- Use `%v` to obfuscate the underlying error.
-  Callers will be unable to match it,
-  but you can switch to `%w` in the future if needed.
+- `%w` — ใช้เมื่อผู้เรียกควรเข้าถึง error ต้นฉบับได้ `%w` เป็นตัวเลือก เริ่มต้นที่ดี สำหรับการ wrap error ส่วนใหญ่ ช่วยให้สามารถใช้ `errors.Is()` หรือ `errors.As()` ดักจับ error ดั้งเดิมได้ภายหลัง แต่ควรระวังว่า ผู้ใช้ function อาจเริ่มพึ่งพาพฤติกรรมนี้ หากคุณเผยแพร่ error นั้นแบบ public หากคุณ wrap ด้วย `%w` และใช้ error แบบมี type หรือเป็น `var` ที่รู้จัก — ควร เขียนเอกสารให้ชัดเจน (function contract) และ เขียน test รองรับ
+- `%v` — ใช้เมื่อไม่ต้องการให้ผู้เรียกเข้าถึง error ต้นฉบับ ทำให้ error ต้นฉบับ ถูกซ่อนไว้ (obfuscate) ผู้เรียก ไม่สามารถ ใช้ `errors.Is` หรือ `errors.As` ตรวจจับได้ หากต้องการ เปลี่ยนกลับมาใช้ `%w` ในภายหลังก็สามารถทำได้ง่าย
 
-When adding context to returned errors, keep the context succinct by avoiding
-phrases like "failed to", which state the obvious and pile up as the error
-percolates up through the stack:
+เมื่อเพิ่มบริบท (context) ให้กับ error ที่ return กลับ ควรเขียนให้ กระชับ โดย หลีกเลี่ยงคำอย่าง “failed to” ซึ่งมักจะระบุสิ่งที่เห็นได้ชัดอยู่แล้ว และเมื่อ error ถูกส่งผ่านขึ้นมาหลายชั้น คำพวกนี้จะสะสมจนอ่านยาก:
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -959,41 +933,42 @@ x: y: new store: the error
 </td></tr>
 </tbody></table>
 
-However once the error is sent to another system, it should be clear the
-message is an error (e.g. an `err` tag or "Failed" prefix in logs).
+อย่างไรก็ตาม เมื่อส่ง error ไปยังระบบอื่น (เช่นระบบ logging หรือ monitoring), ควรทำให้ ชัดเจนว่าเป็นข้อความ error — ตัวอย่างเช่น
+* ใส่ tag ว่า err หรือ error
+* หรือใช้ prefix อย่างเช่น "Failed" ใน log message
 
-See also [Don't just check errors, handle them gracefully](https://dave.cheney.net/2016/04/27/dont-just-check-errors-handle-them-gracefully).
+ดูเพิ่มเติม [Don't just check errors, handle them gracefully](https://dave.cheney.net/2016/04/27/dont-just-check-errors-handle-them-gracefully).
 
 #### Error Naming
 
-For error values stored as global variables,
-use the prefix `Err` or `err` depending on whether they're exported.
-This guidance supersedes the [Prefix Unexported Globals with _](#prefix-unexported-globals-with-_).
+สำหรับค่าประเภท error ที่เก็บเป็น ตัวแปร global (ระดับ package), ควรตั้งชื่อตามหลักต่อไปนี้:
+* ใช้ คำนำหน้า Err สำหรับตัวแปรที่ exported (ตัวแปรที่ขึ้นต้นด้วยตัวพิมพ์ใหญ่ และสามารถใช้งานนอกแพ็กเกจได้)
+* ใช้ คำนำหน้า err สำหรับตัวแปรที่ unexported (ตัวแปรที่ขึ้นต้นด้วยตัวพิมพ์เล็ก ใช้งานได้เฉพาะในแพ็กเกจ)
+แนวทางนี้ สำคัญกว่า แนวทางทั่วไปที่ว่า [Prefix Unexported Globals with _](#prefix-unexported-globals-with-_)
 
 ```go
 var (
-  // The following two errors are exported
-  // so that users of this package can match them
-  // with errors.Is.
+  // error เหล่านี้เป็น exported — ให้ใช้ prefix `Err`
+  // เพื่อให้ผู้ใช้สามารถตรวจสอบ error ด้วย errors.Is ได้
 
   ErrBrokenLink = errors.New("link is broken")
   ErrCouldNotOpen = errors.New("could not open")
 
-  // This error is not exported because
-  // we don't want to make it part of our public API.
-  // We may still use it inside the package
-  // with errors.Is.
+  // error นี้ไม่ export — ใช้ prefix `err`
+  // เพราะไม่อยากให้กลายเป็นส่วนหนึ่งของ public API
+  // แต่ยังใช้ตรวจสอบกับ errors.Is ได้ภายในแพ็กเกจ
 
   errNotFound = errors.New("not found")
 )
 ```
 
-For custom error types, use the suffix `Error` instead.
+สำหรับ custom error types (ชนิด error ที่เราสร้างเอง), ควรตั้งชื่อด้วย คำนำหน้า ชื่อ + คำต่อท้ายว่า Error เพื่อให้สื่อชัดเจนว่าเป็นประเภทของ error
+* หากต้องการ export ชนิด error นี้ (ให้คนใช้งานจากภายนอกตรวจจับได้ด้วย errors.As) → ตั้งชื่อขึ้นต้นด้วยตัวพิมพ์ใหญ่ และลงท้ายด้วย Error
+* ถ้าใช้เฉพาะใน package และ ไม่อยากให้เป็น public API → ขึ้นต้นด้วยตัวพิมพ์เล็ก แต่ยังคงใช้ Error เป็น suffix
 
 ```go
-// Similarly, this error is exported
-// so that users of this package can match it
-// with errors.As.
+// Exported custom error type — ชื่อขึ้นต้นด้วยตัวพิมพ์ใหญ่ + ลงท้ายด้วย Error
+// เพื่อให้ผู้ใช้สามารถดักจับด้วย errors.As ได้
 
 type NotFoundError struct {
   File string
@@ -1003,10 +978,8 @@ func (e *NotFoundError) Error() string {
   return fmt.Sprintf("file %q not found", e.File)
 }
 
-// And this error is not exported because
-// we don't want to make it part of the public API.
-// We can still use it inside the package
-// with errors.As.
+// Unexported custom error type — ชื่อขึ้นต้นด้วยตัวพิมพ์เล็ก + ลงท้ายด้วย Error
+// ใช้ภายในแพ็กเกจเท่านั้น แต่ยังสามารถใช้ errors.As ตรวจจับได้
 
 type resolveError struct {
   Path string
@@ -1019,37 +992,32 @@ func (e *resolveError) Error() string {
 
 #### Handle Errors Once
 
-When a caller receives an error from a callee,
-it can handle it in a variety of different ways
-depending on what it knows about the error.
+เมื่อฟังก์ชันหนึ่ง (caller) เรียกใช้งานอีกฟังก์ชัน (callee) แล้วได้ error กลับมา —
+caller สามารถจัดการ error นั้นได้หลายวิธี ขึ้นอยู่กับว่า caller รู้ข้อมูลเกี่ยวกับ error นั้นมากแค่ไหน
 
-These include, but not are limited to:
+วิธีที่นิยมใช้ ได้แก่ (แต่ไม่จำกัดแค่นี้):
 
-- if the callee contract defines specific errors,
-  matching the error with `errors.Is` or `errors.As`
-  and handling the branches differently
-- if the error is recoverable,
-  logging the error and degrading gracefully
-- if the error represents a domain-specific failure condition,
-  returning a well-defined error
-- returning the error, either [wrapped](#error-wrapping) or verbatim
+- ถ้า callee มีการระบุ contract ไว้ชัดเจนว่าอาจ return error แบบใด
+  → caller ควรใช้ `errors.Is` หรือ `errors.As` เพื่อ match กับ error ที่ระบุไว้ และจัดการแต่ละกรณีให้เหมาะสม
+- ถ้า error นั้นสามารถกู้ได้ (recoverable) → ก็อาจแค่ log ไว้ แล้วทำงานต่อไปในโหมด degraded ได้
+- ถ้า error นั้นเป็นเงื่อนไขความล้มเหลวเฉพาะในโดเมนของระบบ → อาจแปลงเป็น error แบบใหม่ที่นิยามไว้ชัดเจน (well-defined) แล้ว return กลับไป
+- หรืออาจเลือก return error เดิมกลับไป (จะห่อหุ้มไว้ด้วย error [wrapped](#error-wrapping) หรือไม่ก็ได้)
 
-Regardless of how the caller handles the error,
-it should typically handle each error only once.
-The caller should not, for example, log the error and then return it,
-because *its* callers may handle the error as well.
+อย่างไรก็ตาม ไม่ว่าจะเลือกจัดการ error แบบไหน ควรจัดการแต่ละครั้งเพียงครั้งเดียวเท่านั้น (handle once)
+ช่น: ไม่ควร log error แล้ว return ต่อขึ้นไป เพราะ ผู้เรียกถัดไป (upstream caller) อาจต้องการจัดการ error นั้นด้วยเช่นกัน
+→ การ log ซ้ำหลายรอบจะทำให้เกิด log ซ้ำซ้อน (duplicate log) และทำให้ trace ยากขึ้น
 
-For example, consider the following cases:
+ตัวอย่างเช่น ลองพิจารณากรณีต่าง ๆ ต่อไปนี้:
 
 <table>
 <thead><tr><th>Description</th><th>Code</th></tr></thead>
 <tbody>
 <tr><td>
 
-**Bad**: Log the error and return it
+**Bad**: Log error แล้ว return error ซ้ำ
 
-Callers further up the stack will likely take a similar action with the error.
-Doing so causing a lot of noise in the application logs for little value.
+ฟังก์ชันที่อยู่สูงขึ้นไปใน call stack ก็มักจะจัดการ error นั้นเหมือนกัน (เช่น log อีกที)
+การทำแบบนี้จะทำให้เกิด “ข้อความ log ที่เกินจำเป็น” ใน log จำนวนมาก โดยไม่มีประโยชน์จริง
 
 </td><td>
 
@@ -1065,11 +1033,9 @@ if err != nil {
 </td></tr>
 <tr><td>
 
-**Good**: Wrap the error and return it
+**Good**: Wrap แล้ว return error
 
-Callers further up the stack will handle the error.
-Use of `%w` ensures they can match the error with `errors.Is` or `errors.As`
-if relevant.
+ฟังก์ชันที่อยู่สูงขึ้นใน call stack จะเป็นผู้จัดการ error ต่อ การใช้ `%w` ใน `fmt.Errorf` จะช่วยให้ caller สามารถตรวจสอบประเภทของ error ได้ ผ่าน `errors.Is` หรือ `errors.As` ถ้าจำเป็น
 
 </td><td>
 
@@ -1083,18 +1049,17 @@ if err != nil {
 </td></tr>
 <tr><td>
 
-**Good**: Log the error and degrade gracefully
+**Good**: Log แล้ว degrade gracefully
 
-If the operation isn't strictly necessary,
-we can provide a degraded but unbroken experience
-by recovering from it.
+หาก operation นั้นไม่จำเป็นถึงขั้นต้องล้มเหลวทั้งระบบ
+เราสามารถเลือก “ดัก” error ไว้ พร้อมกับแสดงผลหรือทำงานต่อในรูปแบบที่ลดระดับคุณภาพลง
+แต่ยังให้ระบบทำงานต่อได้ โดยไม่พังทั้งหมด
 
 </td><td>
 
 ```go
 if err := emitMetrics(); err != nil {
-  // Failure to write metrics should not
-  // break the application.
+  // ถ้า emitMetrics() เกิด error ก็ไม่ควรให้แอปพังหรือหยุดทำงาน
   log.Printf("Could not emit metrics: %v", err)
 }
 
@@ -1103,14 +1068,12 @@ if err := emitMetrics(); err != nil {
 </td></tr>
 <tr><td>
 
-**Good**: Match the error and degrade gracefully
+**Good**: ดักจับ error แล้ว degrade gracefully
 
-If the callee defines a specific error in its contract,
-and the failure is recoverable,
-match on that error case and degrade gracefully.
-For all other cases, wrap the error and return it.
-
-Callers further up the stack will handle other errors.
+ถ้า callee ระบุ error แบบเฉพาะเจาะจงใน contract ไว้
+และ error นั้นสามารถกู้ได้ (recoverable)
+ให้ตรวจสอบ (match) กับ error กรณีนั้น และจัดการแบบ degrade gracefully
+ส่วนกรณีอื่น ๆ ให้ wrap error แล้ว return กลับไป
 
 </td><td>
 
@@ -1131,8 +1094,8 @@ if err != nil {
 
 ### Handle Type Assertion Failures
 
-The single return value form of a [type assertion](https://go.dev/ref/spec#Type_assertions) will panic on an incorrect
-type. Therefore, always use the "comma ok" idiom.
+การใช้ [type assertion](https://go.dev/ref/spec#Type_assertions) แบบคืนค่าเดียวจะทำให้เกิด panic หากชนิดไม่ตรง
+ดังนั้นควรใช้รูปแบบ “comma ok” เสมอ (รูปแบบที่คืนค่ามาสองตัว: ค่าและตัวบอกความถูกต้อง)
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -1160,9 +1123,8 @@ fine. -->
 
 ### Don't Panic
 
-Code running in production must avoid panics. Panics are a major source of
-[cascading failures](https://en.wikipedia.org/wiki/Cascading_failure). If an error occurs, the function must return an error and
-allow the caller to decide how to handle it.
+โค้ดที่รันใน production ควรหลีกเลี่ยงการใช้ panic เพราะ panic เป็นสาเหตุสำคัญของ [cascading failures](https://en.wikipedia.org/wiki/Cascading_failure) — ความล้มเหลวที่ลุกลามไปยังระบบอื่น ๆ
+หากเกิดข้อผิดพลาด ให้คืนค่าเป็น error แล้วปล่อยให้ caller เป็นผู้ตัดสินใจว่าจะจัดการอย่างไร
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -1204,10 +1166,8 @@ func main() {
 </td></tr>
 </tbody></table>
 
-Panic/recover is not an error handling strategy. A program must panic only when
-something irrecoverable happens such as a nil dereference. An exception to this is
-program initialization: bad things at program startup that should abort the
-program may cause panic.
+การใช้ panic/recover ไม่ใช่ วิธีในการจัดการข้อผิดพลาด (error handling strategy)
+โปรแกรมควรใช้ panic เฉพาะในกรณีที่ไม่สามารถกู้คืนได้จริง ๆ เท่านั้น เช่น การ dereference ตัวแปรที่เป็น nil
 
 ```go
 var _statusTemplate = template.Must(template.New("name").Parse("_statusHTML"))

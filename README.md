@@ -1173,8 +1173,9 @@ func main() {
 var _statusTemplate = template.Must(template.New("name").Parse("_statusHTML"))
 ```
 
-Even in tests, prefer `t.Fatal` or `t.FailNow` over panics to ensure that the
-test is marked as failed.
+แม้แต่ในการเขียนเทสต์ ก็ไม่ควรใช้ panic
+ควรใช้ `t.Fatal` หรือ `t.FailNow` เพื่อให้ Go testing framework
+ระบุสถานะของเทสต์ว่า “ล้มเหลว” ได้อย่างถูกต้อง
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -1206,12 +1207,13 @@ if err != nil {
 
 ### Use go.uber.org/atomic
 
-Atomic operations with the [sync/atomic](https://pkg.go.dev/sync/atomic) package operate on the raw types
-(`int32`, `int64`, etc.) so it is easy to forget to use the atomic operation to
-read or modify the variables.
+การทำ atomic operation ด้วยแพ็กเกจ [sync/atomic](https://pkg.go.dev/sync/atomic) จะทำงานกับ type standard เช่น int32, int64 โดยตรง
+ซึ่งทำให้ ง่ายต่อการลืม ว่าต้องใช้ฟังก์ชัน atomic เพื่ออ่านหรือเขียนค่าตัวแปรเหล่านั้น
 
-[go.uber.org/atomic](https://pkg.go.dev/go.uber.org/atomic) adds type safety to these operations by hiding the
-underlying type. Additionally, it includes a convenient `atomic.Bool` type.
+[go.uber.org/atomic](https://pkg.go.dev/go.uber.org/atomic) ช่วยเพิ่ม ความปลอดภัยของชนิดข้อมูล (type safety) ให้กับการทำงานแบบ atomic
+โดยการ ซ่อนชนิดข้อมูลระดับล่าง (underlying type) ไม่ให้ผู้ใช้เข้าถึงโดยตรง
+
+นอกจากนี้ยังมี type ที่ใช้งานสะดวก เช่น atomic.Bool สำหรับจัดการค่าบูลีนในรูปแบบ atomic ได้ง่ายขึ้นอีกด้วย
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -1261,8 +1263,10 @@ func (f *foo) isRunning() bool {
 
 ### Avoid Mutable Globals
 
-Avoid mutating global variables, instead opting for dependency injection.
-This applies to function pointers as well as other kinds of values.
+หลีกเลี่ยงการเปลี่ยนแปลงค่าของตัวแปร global (mutating global variables)
+ให้เลือกใช้ dependency injection แทน
+
+หลักการนี้ใช้ได้กับทั้ง ตัวชี้ไปยังฟังก์ชัน (function pointers) รวมถึง ค่าประเภทอื่น ๆ ด้วย
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -1338,14 +1342,13 @@ func TestSigner(t *testing.T) {
 
 ### Avoid Embedding Types in Public Structs
 
-These embedded types leak implementation details, inhibit type evolution, and
-obscure documentation.
+การฝัง type แบบนี้จะทำให้ รายละเอียดของ implementation รั่วออกไป,
+ขัดขวางการพัฒนา/เปลี่ยนแปลง type ในอนาคต, และ ทำให้เอกสารอ่านยาก
 
-Assuming you have implemented a variety of list types using a shared
-`AbstractList`, avoid embedding the `AbstractList` in your concrete list
-implementations.
-Instead, hand-write only the methods to your concrete list that will delegate
-to the abstract list.
+สมมุติว่าคุณมีการสร้าง list หลายประเภท โดยใช้ type ที่แชร์ร่วมกันชื่อว่า `AbstractList`
+อย่า embed `AbstractList` ลงใน struct ที่เป็น concrete list โดยตรง
+แต่ให้เลือกวิธีการเขียน method ด้วยตัวเองใน concrete list
+เพื่อให้แต่ละ method delegate (เรียกใช้งาน) ไปยัง `AbstractList` แทน
 
 ```go
 type AbstractList struct {}
@@ -1395,22 +1398,25 @@ func (l *ConcreteList) Remove(e Entity) {
 </td></tr>
 </tbody></table>
 
-Go allows [type embedding](https://go.dev/doc/effective_go#embedding) as a compromise between inheritance and composition.
-The outer type gets implicit copies of the embedded type's methods.
-These methods, by default, delegate to the same method of the embedded
-instance.
+Go รองรับ [type embedding](https://go.dev/doc/effective_go#embedding) ซึ่งเป็น กลไกที่อยู่ระหว่าง inheritance และ composition
 
-The struct also gains a field by the same name as the type.
-So, if the embedded type is public, the field is public.
-To maintain backward compatibility, every future version of the outer type must
-keep the embedded type.
+เมื่อคุณ embed type หนึ่งเข้าไปใน struct อื่น
+struct ด้านนอกจะได้รับ method ของ type ที่ฝังอยู่โดยอัตโนมัติ
+โดย method เหล่านั้นจะทำหน้าที่ delegate (เรียกต่อ) ไปยัง method เดียวกันของค่าที่ฝังไว้
 
-An embedded type is rarely necessary.
-It is a convenience that helps you avoid writing tedious delegate methods.
+struct ยังจะได้รับ field ที่มีชื่อเหมือนกับ type ที่ถูกฝัง
+ดังนั้น ถ้า type ที่ embed เป็นแบบ public → field นั้นก็จะกลายเป็น public ด้วยโดยอัตโนมัติ
 
-Even embedding a compatible AbstractList *interface*, instead of the struct,
-would offer the developer more flexibility to change in the future, but still
-leak the detail that the concrete lists use an abstract implementation.
+และเพื่อให้ struct คงความเข้ากันได้กับเวอร์ชันเก่า (backward compatibility)
+ทุกเวอร์ชันในอนาคต จำเป็นต้องคง type ที่ฝังไว้ มิฉะนั้นจะทำให้ code ที่พึ่งพา method จากการ embed พังได้
+
+การ embed type โดยตรงมักไม่จำเป็นนัก
+มันเป็นเพียง “ความสะดวก” ที่ช่วยให้คุณไม่ต้องเขียน method delegate ด้วยตัวเอง
+
+แม้คุณจะ embed เป็น *interface* (เช่น AbstractList) แทนที่จะเป็น struct
+สิ่งนี้ก็ยังช่วยให้คุณ ยืดหยุ่นต่อการเปลี่ยนแปลงในอนาคตได้มากขึ้น
+แต่ถึงอย่างนั้น ก็ยัง เปิดเผยรายละเอียดภายใน ว่า concrete list ที่คุณใช้นั้น
+มีการอิงอยู่กับ abstract implementation อยู่เบื้องหลังอยู่ดี
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -1453,29 +1459,29 @@ func (l *ConcreteList) Remove(e Entity) {
 </td></tr>
 </tbody></table>
 
-Either with an embedded struct or an embedded interface, the embedded type
-places limits on the evolution of the type.
+ไม่ว่าจะเป็นการ embed struct หรือ embed interface — การฝัง type แบบนี้ จะจำกัดความสามารถในการพัฒนา (evolve) ของ type ที่ฝังไว้ในอนาคต
 
-- Adding methods to an embedded interface is a breaking change.
-- Removing methods from an embedded struct is a breaking change.
-- Removing the embedded type is a breaking change.
-- Replacing the embedded type, even with an alternative that satisfies the same
-  interface, is a breaking change.
+ข้อจำกัดที่ตามมา ได้แก่:
+* การเพิ่ม method ใน interface ที่ถูกฝัง จะถือว่าเป็น breaking change (ทำให้โค้ดเดิมพัง)
+* การลบ method จาก struct ที่ฝังไว้ ก็เป็น breaking change
+* การลบ type ที่ถูก embed ออกไป ถือว่าเป็น breaking change
+* แม้แต่การ เปลี่ยนไปใช้ type อื่นที่ implement interface เดียวกันก็ยังถือเป็น breaking change เช่นกัน
 
-Although writing these delegate methods is tedious, the additional effort hides
-an implementation detail, leaves more opportunities for change, and also
-eliminates indirection for discovering the full List interface in
-documentation.
+ถึงแม้การเขียน method แบบ delegate ด้วยตัวเองจะดูน่าเบื่อ
+แต่การลงทุนลงแรงตรงนี้จะให้ประโยชน์ระยะยาว เช่น:
+* ซ่อนรายละเอียดของ implementation ภายใน ไม่ให้รั่วออกไป
+* เปิดโอกาสให้เปลี่ยนแปลงโครงสร้างภายใน ได้ในอนาคต โดยไม่กระทบผู้ใช้
+* ช่วยให้เอกสาร API ชัดเจนขึ้น เพราะทุก method ของ interface จะปรากฏตรง ๆ ไม่ต้องตามไปดูว่า embedded มาจากไหน
 
 ### Avoid Using Built-In Names
 
-The Go [language specification](https://go.dev/ref/spec) outlines several built-in,
-[predeclared identifiers](https://go.dev/ref/spec#Predeclared_identifiers) that should not be used as names within Go programs.
+ตามที่ระบุไว้ใน ภาษา Go [language specification](https://go.dev/ref/spec) — มี ชื่อที่ถูกประกาศไว้ล่วงหน้า ([predeclared identifiers](https://go.dev/ref/spec#Predeclared_identifiers))
+ที่ไม่ควรนำมาใช้เป็นชื่อในโปรแกรมของเราเอง เช่น int, string, error, len, bool, copy, make ฯลฯ
 
-Depending on context, reusing these identifiers as names will either shadow
-the original within the current lexical scope (and any nested scopes) or make
-affected code confusing. In the best case, the compiler will complain; in the
-worst case, such code may introduce latent, hard-to-grep bugs.
+หากคุณใช้ชื่อเหล่านี้ซ้ำในบริบทของคุณเอง อาจทำให้:
+* ค่าต้นฉบับถูก shadow ใน scope ปัจจุบันหรือลูก ๆ
+* โค้ดอ่านยาก สับสน และยากต่อการ debug หรือค้นหา
+* บางกรณี compiler จะเตือน แต่บางกรณีจะทำงานได้ และอาจแอบแฝง bug ที่ตรวจเจอยาก
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -1484,12 +1490,12 @@ worst case, such code may introduce latent, hard-to-grep bugs.
 
 ```go
 var error string
-// `error` shadows the builtin
+// `error` กลายเป็นตัวแปร string → ทำให้ shadow type error เดิมของ Go
 
-// or
+// หรือ
 
 func handleErrorMessage(error string) {
-    // `error` shadows the builtin
+    // ชื่อพารามิเตอร์ `error` shadow type `error` ที่เป็น built-in
 }
 ```
 
@@ -1497,12 +1503,12 @@ func handleErrorMessage(error string) {
 
 ```go
 var errorMessage string
-// `error` refers to the builtin
+// `error` ยังคงอ้างถึง type error ของภาษาได้ตามปกติ
 
-// or
+// หรือ
 
 func handleErrorMessage(msg string) {
-    // `error` refers to the builtin
+    // ชื่อพารามิเตอร์ `msg` ไม่ทับกับชื่อ built-in ใด ๆ
 }
 ```
 
@@ -1554,30 +1560,37 @@ func (f Foo) String() string {
 </td></tr>
 </tbody></table>
 
-Note that the compiler will not generate errors when using predeclared
-identifiers, but tools such as `go vet` should correctly point out these and
-other cases of shadowing.
+โปรดทราบว่า compiler ของ Go จะไม่แสดง error หากคุณใช้ชื่อที่ชนกับ predeclared identifiers (ชื่อที่ถูกประกาศไว้ล่วงหน้า เช่น error, string, int, len, ฯลฯ)
+
+อย่างไรก็ตาม เครื่องมือวิเคราะห์โค้ด เช่น `go vet`
+จะสามารถตรวจจับกรณีเหล่านี้ (รวมถึงการ shadow อื่น ๆ) ได้อย่างถูกต้อง และช่วยเตือนให้คุณระวัง
 
 ### Avoid `init()`
 
-Avoid `init()` where possible. When `init()` is unavoidable or desirable, code
-should attempt to:
+ควรหลีกเลี่ยงการใช้ฟังก์ชัน `init()` ใน Go ให้มากที่สุดเท่าที่เป็นไปได้
+แต่ถ้าจำเป็นจริง ๆ หรือมีเหตุผลที่เหมาะสมในการใช้ `init()` โค้ดภายในควรพยายามปฏิบัติตามแนวทางดังนี้
 
-1. Be completely deterministic, regardless of program environment or invocation.
-2. Avoid depending on the ordering or side-effects of other `init()` functions.
-   While `init()` ordering is well-known, code can change, and thus
-   relationships between `init()` functions can make code brittle and
-   error-prone.
-3. Avoid accessing or manipulating global or environment state, such as machine
-   information, environment variables, working directory, program
-   arguments/inputs, etc.
-4. Avoid I/O, including both filesystem, network, and system calls.
+1. ต้องทำงานแบบกำหนดผลลัพธ์ได้แน่นอน
+   ไม่ควรให้ผลลัพธ์ของ `init()` เปลี่ยนแปลงตามสภาพแวดล้อมหรือวิธีเรียกโปรแกรม
+2. อย่าพึ่งพาลำดับหรือผลข้างเคียงของ `init()` อื่น ๆ
+   ถึงแม้ Go จะมีลำดับการเรียก `init()` ที่แน่นอน แต่ code สามารถเปลี่ยนได้ในอนาคต
+   การพึ่งพา `init()` ของไฟล์อื่นหรือ package อื่นจะทำให้ระบบเปราะบาง และเกิด bug ได้ง่าย
+3. หลีกเลี่ยงการเข้าถึงหรือแก้ไข state ของระบบหรือ environment
+   เช่น: ข้อมูลของเครื่อง, environment variables, working directory, ค่าพารามิเตอร์ของโปรแกรม ฯลฯ
+4. หลีกเลี่ยงการทำ I/O ทุกประเภท เช่นการอ่านเขียนไฟล์, เชื่อมต่อ network, หรือเรียก system call
 
-Code that cannot satisfy these requirements likely belongs as a helper to be
-called as part of `main()` (or elsewhere in a program's lifecycle), or be
-written as part of `main()` itself. In particular, libraries that are intended
-to be used by other programs should take special care to be completely
-deterministic and not perform "init magic".
+
+หาก code ไม่สามารถทำตามข้อกำหนดข้างต้นได้
+แสดงว่า code เหล่านั้น ควรถูกย้ายออกจาก `init()` และเขียนเป็นฟังก์ชันช่วยเหลือ (helper)
+ให้ถูกเรียกอย่างชัดเจนจาก `main()` หรือจุดอื่นที่เหมาะสมใน lifecycle ของโปรแกรม
+
+โดยเฉพาะอย่างยิ่งใน library ที่เขียนให้คนอื่นใช้งาน
+ควร หลีกเลี่ยงการทำงานอัตโนมัติใน `init()` อย่างเด็ดขาด — เพื่อให้ predictable และควบคุมได้ง่าย
+
+สรุป:
+
+`init()` อาจดูสะดวก แต่หากใช้ผิดที่ผิดเวลา จะสร้างความซับซ้อนและทำให้โค้ดพังยาก
+ทางที่ดีคือควบคุมการเริ่มต้นทุกอย่างผ่าน `main()` หรือ explicit call แทนการพึ่ง “init magic”
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -1665,21 +1678,19 @@ func loadConfig() Config {
 </td></tr>
 </tbody></table>
 
-Considering the above, some situations in which `init()` may be preferable or
-necessary might include:
+จากแนวทางที่กล่าวมาข้างต้น ยังมีบางกรณีที่ การใช้ `init()` อาจเหมาะสมหรือจำเป็น เช่น:
 
-- Complex expressions that cannot be represented as single assignments.
-- Pluggable hooks, such as `database/sql` dialects, encoding type registries, etc.
-- Optimizations to [Google Cloud Functions](https://cloud.google.com/functions/docs/bestpractices/tips#use_global_variables_to_reuse_objects_in_future_invocations) and other forms of deterministic
-  precomputation.
+- นิพจน์ (expression) ที่ซับซ้อน: ซึ่งไม่สามารถกำหนดค่าได้ด้วย assignment เดียว เช่น การสร้าง map ซ้อนหลายชั้น หรือค่าคงที่ที่ต้องคำนวณหลายขั้นตอน
+- ระบบที่ต้องการ hook แบบ plug-in: เช่น การ register dialect ของ `database/sql`, register `encoder/decoder` หรือ handler กับ registry แบบ global
+- การ optimize สำหรับระบบอย่าง [Google Cloud Functions](https://cloud.google.com/functions/docs/bestpractices/tips#use_global_variables_to_reuse_objects_in_future_invocations) ที่เน้นให้ initializations เกิดเพียงครั้งเดียว และ reuse object เดิมใน future invocations ได้ — โดยที่ init() จะทำงานแค่รอบแรกเท่านั้น จึงเหมาะกับ deterministic precomputation
 
 ### Exit in Main
 
-Go programs use [`os.Exit`](https://pkg.go.dev/os#Exit) or [`log.Fatal*`](https://pkg.go.dev/log#Fatal) to exit immediately. (Panicking
-is not a good way to exit programs, please [don't panic](#dont-panic).)
+ในโปรแกรมภาษา Go หากต้องการออกจากโปรแกรมทันที ควรใช้ [`os.Exit`](https://pkg.go.dev/os#Exit) หรือ [`log.Fatal*`](https://pkg.go.dev/log#Fatal)
+อย่าใช้ panic เพื่อออกจากโปรแกรม — อ่านเพิ่มเติมได้ที่หัวข้อ [don't panic](#dont-panic)
 
-Call one of `os.Exit` or `log.Fatal*` **only in `main()`**. All other
-functions should return errors to signal failure.
+ให้เรียก `os.Exit` หรือ `log.Fatal*` **เฉพาะในฟังก์ชัน `main()`** เท่านั้น
+ฟังก์ชันอื่น ๆ ควร คืนค่า error กลับมาให้ caller จัดการเอง
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -1736,25 +1747,25 @@ func readFile(path string) (string, error) {
 </td></tr>
 </tbody></table>
 
-Rationale: Programs with multiple functions that exit present a few issues:
+เหตุผล: ทำไมจึงควรเรียก `os.Exit` หรือ `log.Fatal*` แค่ใน main()
 
-- Non-obvious control flow: Any function can exit the program so it becomes
-  difficult to reason about the control flow.
-- Difficult to test: A function that exits the program will also exit the test
-  calling it. This makes the function difficult to test and introduces risk of
-  skipping other tests that have not yet been run by `go test`.
-- Skipped cleanup: When a function exits the program, it skips function calls
-  enqueued with `defer` statements. This adds risk of skipping important
-  cleanup tasks.
+- ควบคุม flow ได้ยาก: เมื่อต้องวิเคราะห์ลำดับการทำงานของโปรแกรม จะทำได้ยากมาก เพราะทุกฟังก์ชันมีสิทธิ์เรียก exit ได้
+  ทำให้ไม่สามารถมั่นใจได้ว่าโค้ดหลังจากนั้นจะถูกเรียกหรือไม่
+- เขียน test ได้ลำบาก: ถ้าฟังก์ชันทดลองเรียก `log.Fatal()` หรือ `os.Exit()` จะทำให้ test ที่เรียกมันอยู่หยุดทำงานทันที
+  ส่งผลให้ test อื่นที่ยังไม่ได้รัน ถูกข้ามไปทั้งหมด ซึ่งอาจทำให้พลาดเจอ bug ที่สำคัญได้
+- ข้ามขั้นตอน cleanup ที่ใช้ defer: การออกจากโปรแกรมโดยตรงจะ ข้ามฟังก์ชันที่ถูก `defer` ไว้
+  นั่นหมายถึง การล้างไฟล์, ปล่อย resource, ปิด connection ฯลฯ จะไม่ถูกเรียก
+  และอาจทำให้เกิด memory leak หรือปัญหาทับซ้อนภายหลัง
 
 #### Exit Once
 
-If possible, prefer to call `os.Exit` or `log.Fatal` **at most once** in your
-`main()`. If there are multiple error scenarios that halt program execution,
-put that logic under a separate function and return errors from it.
+หากเป็นไปได้ ควรเรียก `os.Exit` หรือ `log.Fatal` **ไม่เกินหนึ่งครั้ง** ภายในฟังก์ชัน `main()`
+ในกรณีที่มีหลายเงื่อนไขที่อาจทำให้โปรแกรมหยุดทำงาน ควรแยก logic เหล่านั้นออกมาไว้ในฟังก์ชันแยก และให้ return error กลับมา
 
-This has the effect of shortening your `main()` function and putting all key
-business logic into a separate, testable function.
+ข้อดีของแนวทางนี้
+* ทำให้ main() สั้น กระชับ อ่านง่าย
+* ธุรกิจหลัก (key business logic) ถูกแยกออกมาเป็นฟังก์ชันที่ ทดสอบได้ง่าย
+* ช่วยจัดการ error ได้ชัดเจนและปลอดภัยยิ่งขึ้น
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -1825,8 +1836,7 @@ func run() error {
 </td></tr>
 </tbody></table>
 
-The example above uses `log.Fatal`, but the guidance also applies to
-`os.Exit` or any library code that calls `os.Exit`.
+ตัวอย่างด้านบนใช้ `log.Fatal` แต่อันที่จริง แนวทางนี้สามารถใช้ได้กับ `os.Exit` หรือโค้ดจากไลบรารีใด ๆ ก็ตามที่เรียก `os.Exit` เช่นกัน
 
 ```go
 func main() {
@@ -1837,10 +1847,12 @@ func main() {
 }
 ```
 
-You may alter the signature of `run()` to fit your needs.
-For example, if your program must exit with specific exit codes for failures,
-`run()` may return the exit code instead of an error.
-This allows unit tests to verify this behavior directly as well.
+คุณสามารถปรับรูปแบบของฟังก์ชัน `run()` ให้เหมาะสมกับความต้องการของโปรแกรมได้
+
+ตัวอย่างเช่น หากโปรแกรมของคุณจำเป็นต้อง ออกจากระบบด้วย exit code ที่เฉพาะเจาะจงในแต่ละกรณีของความล้มเหลว
+คุณสามารถเขียนให้ `run()` คืนค่าเป็น int แทน error ได้โดยตรง เพื่อระบุ exit code นั้น
+
+นอกจากนี้ แนวทางนี้ยังช่วยให้คุณสามารถ เขียน unit test เพื่อตรวจสอบพฤติกรรมของ `run()` ได้โดยตรง โดยไม่ต้องพึ่ง `os.Exit()` จริง
 
 ```go
 func main() {

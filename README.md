@@ -3290,9 +3290,9 @@ func printInfo(name string, region Region, status Status)
 
 ### Use Raw String Literals to Avoid Escaping
 
-Go supports [raw string literals](https://go.dev/ref/spec#raw_string_lit),
-which can span multiple lines and include quotes. Use these to avoid
-hand-escaped strings which are much harder to read.
+Go รองรับ [raw string literals](https://go.dev/ref/spec#raw_string_lit) literals ซึ่งใช้ backticks (`) คร่อมข้อความ
+ข้อดีคือสามารถเขียน string ที่มีหลายบรรทัด หรือมีตัวอักษรพิเศษ เช่น quote (") โดยไม่ต้อง escape ด้วย \
+ทำให้โค้ดอ่านง่ายและแก้ไขสะดวกมากขึ้น
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3316,8 +3316,11 @@ wantError := `unknown error:"test"`
 
 #### Use Field Names to Initialize Structs
 
-You should almost always specify field names when initializing structs. This is
-now enforced by [`go vet`](https://pkg.go.dev/cmd/vet).
+คุณควรระบุชื่อฟิลด์ (field names) เมื่อทำการ initialize struct เสมอ เพราะจะช่วยให้โค้ด
+* อ่านง่าย เข้าใจชัดเจนว่าแต่ละค่าใส่ให้ฟิลด์ไหน
+* ป้องกันความผิดพลาดจากการสลับลำดับฟิลด์
+* รองรับการเปลี่ยนแปลงโครงสร้าง struct ในอนาคตได้ง่ายขึ้น
+* นอกจากนี้ [`go vet`](https://pkg.go.dev/cmd/vet) ยังบังคับให้ใช้ field names เมื่อ struct นั้นถูกประกาศไว้นอก package เดียวกัน
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3341,8 +3344,7 @@ k := User{
 </td></tr>
 </tbody></table>
 
-Exception: Field names *may* be omitted in test tables when there are 3 or
-fewer fields.
+ข้อยกเว้น: สามารถละชื่อฟิลด์ได้ หากเป็น test table ที่มีฟิลด์ไม่เกิน 3 ตัว และมีโครงสร้างที่อ่านเข้าใจง่าย
 
 ```go
 tests := []struct{
@@ -3356,9 +3358,7 @@ tests := []struct{
 
 #### Omit Zero Value Fields in Structs
 
-When initializing structs with field names, omit fields that have zero values
-unless they provide meaningful context. Otherwise, let Go set these to zero
-values automatically.
+เมื่อกำหนดค่าให้ struct โดยใช้ชื่อฟิลด์ หากฟิลด์นั้นมีค่าเป็นค่าเริ่มต้นของ type (zero value) และ ไม่มีความหมายเพิ่มเติม แนะนำให้ละไว้ เพื่อให้โค้ดกระชับและชัดเจนยิ่งขึ้น
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3389,9 +3389,10 @@ user := User{
 This helps reduce noise for readers by omitting values that are default in
 that context. Only meaningful values are specified.
 
-Include zero values where field names provide meaningful context. For example,
-test cases in [Test Tables](#test-tables) can benefit from names of fields
-even when they are zero-valued.
+ตัวอย่างนี้แสดงให้เห็นว่า แม้ค่าจะเป็น ศูนย์ (0) ซึ่งเป็นค่าเริ่มต้นของ int ก็ตาม แต่การใส่ want: 0 ไว้อย่างชัดเจนก็มีประโยชน์ เพราะมันช่วยบอกว่า เราตั้งใจ ให้ผลลัพธ์ที่คาดหวังคือ 0 ไม่ใช่แค่ค่าที่ติดมาจากค่าเริ่มต้นของภาษา
+ถึงแม้ Go จะตั้งค่าเป็น 0 ให้อัตโนมัติอยู่แล้ว แต่ในกรณีแบบนี้ การใส่ให้ครบจะช่วยให้คนอ่านเข้าใจได้ทันทีว่าค่า want ถูกใส่มาเพราะมีความหมาย ไม่ใช่ลืมกำหนด
+
+สรุป: ถ้าค่าเริ่มต้นอย่าง 0 หรือ false มีความหมายที่ชัดเจนในบริบท (เช่นใน test case [Test Tables](#test-tables)) ควรใส่ไว้ให้ครบ เพื่อช่วยให้โค้ดอ่านง่ายและเข้าใจเจตนาได้ชัดเจนยิ่งขึ้น.
 
 ```go
 tests := []struct{
@@ -3405,8 +3406,7 @@ tests := []struct{
 
 #### Use `var` for Zero Value Structs
 
-When all the fields of a struct are omitted in a declaration, use the `var`
-form to declare the struct.
+เมื่อมีการประกาศ struct โดยที่ไม่ได้กำหนดค่าให้ field ใดเลย ควรใช้รูปแบบ var แทนการใช้ short variable declaration (`:=`)
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3426,14 +3426,14 @@ var user User
 </td></tr>
 </tbody></table>
 
-This differentiates zero valued structs from those with non-zero fields
-similar to the distinction created for [map initialization](#initializing-maps), and matches how
-we prefer to [declare empty slices](https://go.dev/wiki/CodeReviewComments#declaring-empty-slices).
+สิ่งนี้ช่วยแยกความแตกต่างระหว่าง struct ที่มีค่าเป็น zero value กับ struct ที่มีการกำหนดค่าให้ field บางส่วน
+ในลักษณะเดียวกับที่เราแยกความต่างในการ [map initialization](#initializing-maps)
+และสอดคล้องกับแนวทางที่เราแนะนำให้ใช้ในการ [declare empty slices](https://go.dev/wiki/CodeReviewComments#declaring-empty-slices)
 
 #### Initializing Struct References
 
-Use `&T{}` instead of `new(T)` when initializing struct references so that it
-is consistent with the struct initialization.
+ใช้ `&T{}` แทนการใช้ `new(T)` เมื่อทำการ initialize struct reference
+เพื่อให้รูปแบบการเขียนสอดคล้องกับการ initialize struct โดยทั่วไป
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3461,10 +3461,9 @@ sptr := &T{Name: "bar"}
 
 ### Initializing Maps
 
-Prefer `make(..)` for empty maps, and maps populated
-programmatically. This makes map initialization visually
-distinct from declaration, and it makes it easy to add size
-hints later if available.
+ควรใช้ `make(..)` สำหรับ map ว่าง และ map ที่จะถูกเติมค่าภายหลังด้วยโปรแกรม
+เพราะจะช่วยให้การ initialize map ดูแตกต่างจากการประกาศ ธรรมดา
+และยังทำให้สามารถเพิ่ม size hint ได้ง่ายขึ้นในอนาคตหากมี
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3473,8 +3472,8 @@ hints later if available.
 
 ```go
 var (
-  // m1 is safe to read and write;
-  // m2 will panic on writes.
+  // m1 สามารถอ่านและเขียนได้อย่างปลอดภัย
+  // m2 จะ panic เมื่อเขียนค่า.
   m1 = map[T1]T2{}
   m2 map[T1]T2
 )
@@ -3484,8 +3483,8 @@ var (
 
 ```go
 var (
-  // m1 is safe to read and write;
-  // m2 will panic on writes.
+  // m1 สามารถอ่านและเขียนได้อย่างปลอดภัย
+  // m2 จะ panic เมื่อมีการเขียน
   m1 = make(map[T1]T2)
   m2 map[T1]T2
 )
@@ -3494,22 +3493,19 @@ var (
 </td></tr>
 <tr><td>
 
-Declaration and initialization are visually similar.
+การประกาศและ initialize ดูคล้ายกันเกินไป
 
 </td><td>
 
-Declaration and initialization are visually distinct.
+การประกาศและ initialize แยกกันอย่างชัดเจน ทำให้โค้ดอ่านง่ายกว่า
 
 </td></tr>
 </tbody></table>
 
-Where possible, provide capacity hints when initializing
-maps with `make()`. See
-[Specifying Map Capacity Hints](#specifying-map-capacity-hints)
-for more information.
+ในกรณีที่สามารถคาดการณ์จำนวนข้อมูลได้ ควรใส่ capacity hint ตอน initialize map ด้วย `make()`
+ดูรายละเอียดเพิ่มเติมที่หัวข้อ [Specifying Map Capacity Hints](#specifying-map-capacity-hints)
 
-On the other hand, if the map holds a fixed list of elements,
-use map literals to initialize the map.
+แต่ถ้า map มีรายการข้อมูลคงที่อยู่แล้ว ควรใช้ map literal ในการ initialize แทน
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3536,16 +3532,16 @@ m := map[T1]T2{
 </td></tr>
 </tbody></table>
 
-The basic rule of thumb is to use map literals when adding a fixed set of
-elements at initialization time, otherwise use `make` (and specify a size hint
-if available).
+หลักการพื้นฐานคือ:
+* ถ้าคุณต้องการเพิ่ม รายการข้อมูลคงที่ ตั้งแต่เริ่มต้น → ใช้ map literal
+* ถ้าคุณจะเพิ่มข้อมูลแบบโปรแกรมมิ่งภายหลัง → ใช้ `make()` (และใส่ size hint ถ้ามี)
+
 
 ### Format Strings outside Printf
 
-If you declare format strings for `Printf`-style functions outside a string
-literal, make them `const` values.
+ถ้าคุณจะประกาศ format string สำหรับใช้กับฟังก์ชันตระกูล `Printf` (เช่น fmt.Printf, log.Printf) ไว้ภายนอก string literal โดยตรง — ให้ใช้ `const` เสมอ
 
-This helps `go vet` perform static analysis of the format string.
+เหตุผล: การใช้ const ช่วยให้ `go vet` วิเคราะห์ format string ได้แบบ static ล่วงหน้า และตรวจจับ error ได้แม่นยำขึ้น (เช่น placeholder ไม่ตรงกับ argument)
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3569,33 +3565,31 @@ fmt.Printf(msg, 1, 2)
 
 ### Naming Printf-style Functions
 
-When you declare a `Printf`-style function, make sure that `go vet` can detect
-it and check the format string.
+หากคุณประกาศฟังก์ชันที่ใช้ format string แบบ `Printf` (เช่น fmt.Printf, log.Printf ฯลฯ) ให้แน่ใจว่า go vet สามารถตรวจจับและตรวจสอบ format string ได้ด้วย
 
-This means that you should use predefined `Printf`-style function
-names if possible. `go vet` will check these by default. See [Printf family](https://pkg.go.dev/cmd/vet#hdr-Printf_family)
-for more information.
+แนวทาง
+ถ้าเป็นไปได้ ควรใช้ชื่อที่ Go รู้จักอยู่แล้ว (ดู [Printf family](https://pkg.go.dev/cmd/vet#hdr-Printf_family))
+ถ้าจำเป็นต้องใช้ชื่ออื่น ให้ ลงท้ายชื่อฟังก์ชันด้วย `f` เช่น `Wrapf` แทนที่จะใช้ `Wrap`
 
-If using the predefined names is not an option, end the name you choose with
-f: `Wrapf`, not `Wrap`. `go vet` can be asked to check specific `Printf`-style
-names but they must end with f.
+เพราะ go vet สามารถตั้งค่าให้รู้จักชื่อที่ลงท้ายด้วย f ได้ โดยใช้ flag เช่น:
 
 ```shell
 go vet -printfuncs=wrapf,statusf
 ```
 
-See also [go vet: Printf family check](https://kuzminva.wordpress.com/2017/11/07/go-vet-printf-family-check/).
+ดูเพิ่มเติม [go vet: Printf family check](https://kuzminva.wordpress.com/2017/11/07/go-vet-printf-family-check/).
 
 ## Patterns
 
 ### Test Tables
 
-Table-driven tests with [subtests](https://go.dev/blog/subtests) can be a helpful pattern for writing tests
-to avoid duplicating code when the core test logic is repetitive.
+การใช้ [subtests](https://go.dev/blog/subtests) ร่วมกับตารางทดสอบ (table-driven tests) เป็นแนวทางที่มีประโยชน์สำหรับการเขียนเทสต์
+เพื่อหลีกเลี่ยงการเขียนโค้ดซ้ำซากเมื่อต้องทดสอบ logic แบบเดียวกันหลายกรณี
 
-If a system under test needs to be tested against *multiple conditions* where
-certain parts of the the inputs and outputs change, a table-driven test should
-be used to reduce redundancy and improve readability.
+หากระบบที่คุณต้องการทดสอบ (System Under Test)
+ต้องถูกทดสอบกับหลายเงื่อนไข (*multiple conditions*)
+โดยที่อินพุตหรือผลลัพธ์บางส่วนแตกต่างกันในแต่ละกรณี
+คุณควรใช้รูปแบบตารางทดสอบเพื่อลดความซ้ำซ้อนและเพิ่มความอ่านง่ายของเทสต์
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3671,12 +3665,9 @@ for _, tt := range tests {
 </td></tr>
 </tbody></table>
 
-Test tables make it easier to add context to error messages, reduce duplicate
-logic, and add new test cases.
+การใช้ test tables มีข้อดีหลายประการ ช่วยเพิ่ม context ให้กับข้อความ error, ลดการเขียน logic ซ้ำ, เพิ่ม test case ใหม่ได้สะดวก
 
-We follow the convention that the slice of structs is referred to as `tests`
-and each test case `tt`. Further, we encourage explicating the input and output
-values for each test case with `give` and `want` prefixes.
+แนวทางปฏิบัติที่เราแนะนำ ใช้ชื่อ slice ของ struct สำหรับตารางทดสอบว่า tests, ใช้ตัวแปรชื่อ `tt` แทนแต่ละ test case ภายใน loop, ชื่อฟิลด์ที่เป็นอินพุตและเอาต์พุตควรมี prefix ว่า give (อินพุต) และ want (ค่าที่คาดหวัง)
 
 ```go
 tests := []struct{
@@ -3694,44 +3685,39 @@ for _, tt := range tests {
 
 #### Avoid Unnecessary Complexity in Table Tests
 
-Table tests can be difficult to read and maintain if the subtests contain conditional
-assertions or other branching logic. Table tests should **NOT** be used whenever
-there needs to be complex or conditional logic inside subtests (i.e. complex logic inside the `for` loop).
+Table tests อาจอ่านและดูแลรักษายาก หาก subtests มีเงื่อนไขเชิงซ้อน (conditional assertions) หรือมี branching logic ภายใน for loop
+จึงควร หลีกเลี่ยงการใช้ table test หากมี logic ซับซ้อนหรือมีเงื่อนไขจำนวนมากใน subtest
 
-Large, complex table tests harm readability and maintainability because test readers may
-have difficulty debugging test failures that occur.
+Table tests ที่ซับซ้อนมากเกินไป ส่งผลเสียต่อความสามารถในการอ่านและการดูแลรักษา
+ผู้อ่านอาจลำบากในการวิเคราะห์สาเหตุของ test ที่ล้มเหล
 
-Table tests like this should be split into either multiple test tables or multiple
-individual `Test...` functions.
+ควรแยก table tests ลักษณะนี้ออกเป็น:
+หลาย test tables หรือ หลาย `Test...` functions แยกกัน
 
-Some ideals to aim for are:
+แนวทางที่ควรยึด:
 
-* Focus on the narrowest unit of behavior
-* Minimize "test depth", and avoid conditional assertions (see below)
-* Ensure that all table fields are used in all tests
-* Ensure that all test logic runs for all table cases
+* มุ่งเน้นพฤติกรรมที่แคบและเฉพาะเจาะจงที่สุด
+* ลด “test depth” และหลีกเลี่ยง conditional assertions
+* ตรวจสอบให้แน่ใจว่า field ทุกตัวใน table ถูกใช้ในทุก test case
+* ตรวจสอบให้แน่ใจว่า test logic ถูกรันในทุก test case
 
-In this context, "test depth" means "within a given test, the number of
-successive assertions that require previous assertions to hold" (similar
-to cyclomatic complexity).
-Having "shallower" tests means that there are fewer relationships between
-assertions and, more importantly, that those assertions are less likely
-to be conditional by default.
+“Test depth” คือจำนวนขั้นของ assertion ที่ต้องพึ่งพาผลลัพธ์จาก assertion ก่อนหน้า (คล้ายกับ cyclomatic complexity)
+การมี test ที่ “ตื้น” กว่า (shallower) หมายถึงความสัมพันธ์ระหว่าง assertions มีน้อยลง
+และที่สำคัญคือ assertions เหล่านั้น ไม่น่าจะมีเงื่อนไขแทรกซ้อน
 
-Concretely, table tests can become confusing and difficult to read if they use multiple branching
-pathways (e.g. `shouldError`, `expectCall`, etc.), use many `if` statements for
-specific mock expectations (e.g. `shouldCallFoo`), or place functions inside the
-table (e.g. `setupMocks func(*FooMock)`).
+ตัวอย่างสิ่งที่ควรหลีกเลี่ยงใน table tests:
+* การมี branching หลายทาง เช่น `shouldError`, `expectCall`, เป็นต้น
+* ใช้ `if` หลายตัวเพื่อตรวจสอบ mock เฉพาะทาง เช่น `shouldCallFoo`
+* ใส่ function ลงใน table fields โดยตรง เช่น `setupMocks func(*FooMock)`
 
-However, when testing behavior that only
-changes based on changed input, it may be preferable to group similar cases
-together in a table test to better illustrate how behavior changes across all inputs,
-rather than splitting otherwise comparable units into separate tests
-and making them harder to compare and contrast.
+ข้อยกเว้น:
+เมื่อพฤติกรรมของระบบที่ทดสอบเปลี่ยนไปตาม input ที่แตกต่างกันเพียงอย่างเดียว
+การใช้ table test เพื่อจัดกลุ่มกรณีคล้ายกันก็อาจ เหมาะสมกว่า
+เนื่องจากช่วยเปรียบเทียบพฤติกรรมระหว่าง inputs ได้ชัดเจน
+โดยไม่ต้องแยก test ให้กระจัดกระจายเกินไป
 
-If the test body is short and straightforward,
-it's acceptable to have a single branching pathway for success versus failure cases
-with a table field like `shouldErr` to specify error expectations.
+หาก body ของ test สั้นและตรงไปตรงมา
+การมี branching ทางเดียว เช่น `shouldErr` เพื่อระบุว่าจะเกิด error หรือไม่ ก็ถือว่า ยอมรับได้.
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3817,19 +3803,15 @@ func TestShouldCallYAndFail(t *testing.T) {
 </td></tr>
 </tbody></table>
 
-This complexity makes it more difficult to change, understand, and prove the
-correctness of the test.
+ความซับซ้อนนี้ทำให้ยากต่อการเปลี่ยนแปลง เข้าใจ และพิสูจน์ความถูกต้องของ test
 
-While there are no strict guidelines, readability and maintainability should
-always be top-of-mind when deciding between Table Tests versus separate tests
-for multiple inputs/outputs to a system.
+แม้จะไม่มีแนวทางที่เคร่งครัด การอ่านและการดูแลรักษา (readability และ maintainability) ควรถูกพิจารณาเป็นอันดับแรกเสมอ เมื่อจะตัดสินใจเลือกระหว่างการใช้ Table Tests หรือแยกเป็น test หลายชุด สำหรับ input/output หลายกรณีในระบบ.
 
 #### Parallel Tests
 
-Parallel tests, like some specialized loops (for example, those that spawn
-goroutines or capture references as part of the loop body),
-must take care to explicitly assign loop variables within the loop's scope to
-ensure that they hold the expected values.
+การทดสอบแบบขนาน เช่นเดียวกับลูปบางประเภทที่ซับซ้อน (เช่น ลูปที่ spawn goroutine หรือมีการจับค่าตัวแปรแบบ reference ใน body ของลูป)
+จำเป็นต้องระวังโดยเฉพาะในการกำหนดค่าตัวแปรลูปให้ชัดเจนภายใน scope ของลูป
+เพื่อให้แน่ใจว่าค่าที่ใช้ในแต่ละรอบของลูปเป็นค่าที่ถูกต้องตามที่คาดไว้
 
 ```go
 tests := []struct{
@@ -3840,7 +3822,7 @@ tests := []struct{
 }
 
 for _, tt := range tests {
-  tt := tt // for t.Parallel
+  tt := tt // จำเป็นต้องทำแบบนี้สำหรับ t.Parallel
   t.Run(tt.give, func(t *testing.T) {
     t.Parallel()
     // ...
@@ -3848,23 +3830,21 @@ for _, tt := range tests {
 }
 ```
 
-In the example above, we must declare a `tt` variable scoped to the loop
-iteration because of the use of `t.Parallel()` below.
-If we do not do that, most or all tests will receive an unexpected value for
-`tt`, or a value that changes as they're running.
+ในตัวอย่างข้างต้น เราจำเป็นต้องประกาศตัวแปร `tt` ที่อยู่ใน scope ของแต่ละรอบของลูป
+เนื่องจากมีการใช้ `t.Parallel()` ภายในฟังก์ชันย่อยที่ถูกเรียกในลูปนั้น
+
+หากไม่ทำเช่นนั้น การทดสอบส่วนใหญ่ (หรือทั้งหมด) อาจได้รับค่าของ tt ที่ไม่ตรงกับที่คาดไว้
+หรือค่าของ tt อาจเปลี่ยนแปลงขณะการทดสอบยังคงทำงานอยู่ (เพราะ `tt` ถูกแชร์ระหว่าง goroutines)
 
 <!-- TODO: Explain how to use _test packages. -->
 
 ### Functional Options
 
-Functional options is a pattern in which you declare an opaque `Option` type
-that records information in some internal struct. You accept a variadic number
-of these options and act upon the full information recorded by the options on
-the internal struct.
+Functional options คือ pattern ที่ใช้สร้างชนิดข้อมูล `Option` แบบ opaque (ปิดรายละเอียดภายใน) เพื่อเก็บข้อมูลการตั้งค่าภายใน struct
+โดยรับ parameter แบบ variadic `opts ...Option` และนำข้อมูลทั้งหมดจาก options ไปใช้ในการกำหนดค่าภายใน struct นั้น
 
-Use this pattern for optional arguments in constructors and other public APIs
-that you foresee needing to expand, especially if you already have three or
-more arguments on those functions.
+ใช้ pattern นี้กับ public APIs หรือ constructor functions ที่มี argument หลายตัว หรือที่อาจต้องเพิ่ม argument ในอนาคต
+โดยเฉพาะอย่างยิ่ง หากฟังก์ชันนั้นมีพารามิเตอร์ 3 ตัวขึ้นไปแล้ว
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3912,8 +3892,8 @@ func Open(
 </td></tr>
 <tr><td>
 
-The cache and logger parameters must always be provided, even if the user
-wants to use the default.
+ในตัวอย่างนี้ ผู้ใช้ต้อง ระบุทุกพารามิเตอร์ แม้ไม่ต้องการกำหนดค่าเองก็ตาม
+ส่งผลให้โค้ดดูซับซ้อน ไม่ยืดหยุ่น และไม่สะดวกต่อการใช้งาน
 
 ```go
 db.Open(addr, db.DefaultCache, zap.NewNop())
@@ -3924,7 +3904,7 @@ db.Open(addr, false /* cache */, log)
 
 </td><td>
 
-Options are provided only if needed.
+ผู้ใช้จะกำหนด Option เท่าที่ จำเป็นต้องใช้ เท่านั้น — ทำให้โค้ดสะอาด ยืดหยุ่น และเข้าใจง่าย
 
 ```go
 db.Open(addr)
@@ -3940,9 +3920,7 @@ db.Open(
 </td></tr>
 </tbody></table>
 
-Our suggested way of implementing this pattern is with an `Option` interface
-that holds an unexported method, recording options on an unexported `options`
-struct.
+นี่คือตัวอย่างที่แนะนำในการใช้ Functional Options Pattern แบบเต็มรูปแบบ ด้วย Option interface และ struct ภายใน (unexported) เพื่อจัดเก็บค่าคอนฟิก
 
 ```go
 type options struct {
@@ -3950,10 +3928,12 @@ type options struct {
   logger *zap.Logger
 }
 
+// Option interface (unexported apply method ป้องกันการสร้างจากภายนอกโดยตรง)
 type Option interface {
   apply(*options)
 }
 
+// ---- Option: Cache ----
 type cacheOption bool
 
 func (c cacheOption) apply(opts *options) {
@@ -3964,6 +3944,7 @@ func WithCache(c bool) Option {
   return cacheOption(c)
 }
 
+// ---- Option: Logger ----
 type loggerOption struct {
   Log *zap.Logger
 }
@@ -3983,9 +3964,10 @@ func Open(
 ) (*Connection, error) {
   options := options{
     cache:  defaultCache,
-    logger: zap.NewNop(),
+    logger: zap.NewNop(), // default logger
   }
 
+    // Apply each option
   for _, o := range opts {
     o.apply(&options)
   }
@@ -3994,15 +3976,14 @@ func Open(
 }
 ```
 
-Note that there's a method of implementing this pattern with closures but we
-believe that the pattern above provides more flexibility for authors and is
-easier to debug and test for users. In particular, it allows options to be
-compared against each other in tests and mocks, versus closures where this is
-impossible. Further, it lets options implement other interfaces, including
-`fmt.Stringer` which allows for user-readable string representations of the
-options.
+โปรดทราบว่า มีวิธีหนึ่งในการใช้ functional options โดยใช้ closures (ฟังก์ชันที่ห่อค่าการตั้งค่าไว้ภายใน) แต่เรามองว่า pattern ที่แนะนำด้านบน — ที่ใช้ Option interface — ให้ ความยืดหยุ่นกับผู้พัฒนา และ ง่ายต่อการ debug และ test สำหรับผู้ใช้มากกว่า
 
-See also,
+ข้อดีของวิธีนี้ ได้แก่:
+* สามารถ เปรียบเทียบ options ระหว่างกันได้ ใน unit tests หรือ mocks
+* ซึ่งจะ ทำไม่ได้เลยถ้าใช้ closures เพราะ closure ไม่สามารถเปรียบเทียบได้ตรง ๆ
+* อีกทั้งยังสามารถให้ options implement interface อื่น ๆ ได้ เช่น `fmt.Stringer` เพื่อให้ได้ string representation ที่เหมาะสมสำหรับการ log หรือแสดงผล
+
+ดูเพิ่มเติม
 
 - [Self-referential functions and the design of options](https://commandcenter.blogspot.com/2014/01/self-referential-functions-and-design.html)
 - [Functional options for friendly APIs](https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis)
@@ -4012,26 +3993,23 @@ use one vs other -->
 
 ## Linting
 
-More importantly than any "blessed" set of linters, lint consistently across a
-codebase.
+ยิ่งไปกว่าการมีชุด linter ที่ “ดีที่สุด” คือ การใช้ linter อย่างสม่ำเสมอ ภายใน codebase เดียวกัน
 
-We recommend using the following linters at a minimum, because we feel that they
-help to catch the most common issues and also establish a high bar for code
-quality without being unnecessarily prescriptive:
-
-- [errcheck](https://github.com/kisielk/errcheck) to ensure that errors are handled
-- [goimports](https://pkg.go.dev/golang.org/x/tools/cmd/goimports) to format code and manage imports
-- [golint](https://github.com/golang/lint) to point out common style mistakes
-- [govet](https://pkg.go.dev/cmd/vet) to analyze code for common mistakes
-- [staticcheck](https://staticcheck.dev) to do various static analysis checks
+เราแนะนำให้ใช้ linters ต่อไปนี้อย่างน้อยที่สุด เพราะสามารถช่วยตรวจจับปัญหาทั่วไปได้ดี และช่วยยกระดับคุณภาพของโค้ด โดยไม่เข้มงวดหรือจำกัดเกินไป:
+* [errcheck](https://github.com/kisielk/errcheck): ตรวจสอบว่า error ถูก handle แล้วหรือยัง
+* [goimports](https://pkg.go.dev/golang.org/x/tools/cmd/goimports): จัดรูปแบบโค้ดและจัดการ import ให้อัตโนมัติ
+* [golint](https://github.com/golang/lint): แจ้งเตือนเรื่อง style หรือรูปแบบโค้ดที่ไม่เหมาะสม
+* [govet](https://pkg.go.dev/cmd/vet): วิเคราะห์โค้ดเพื่อหาข้อผิดพลาดที่พบบ่อย
+* [staticcheck](https://staticcheck.dev): ทำ static analysis เชิงลึกเพื่อตรวจสอบคุณภาพโค้ด
 
 ### Lint Runners
 
-We recommend [golangci-lint](https://github.com/golangci/golangci-lint) as the go-to lint runner for Go code, largely due
-to its performance in larger codebases and ability to configure and use many
-canonical linters at once. This repo has an example [.golangci.yml](https://github.com/uber-go/guide/blob/master/.golangci.yml) config file
-with recommended linters and settings.
+เราแนะนำให้ใช้ [golangci-lint](https://github.com/golangci/golangci-lint) เป็นเครื่องมือหลักในการรัน lint สำหรับโค้ด Go
+เนื่องจากมี ประสิทธิภาพสูง โดยเฉพาะกับ codebase ขนาดใหญ่ และสามารถ ตั้งค่าและใช้หลาย linter ได้พร้อมกัน
 
-golangci-lint has [various linters](https://golangci-lint.run/usage/linters/) available for use. The above linters are
-recommended as a base set, and we encourage teams to add any additional linters
-that make sense for their projects.
+ใน repo นี้มีตัวอย่างไฟล์ config คือ .golangci.yml
+ที่รวม linter ที่แนะนำพร้อมการตั้งค่าไว้ให้เรียบร้อยแล้ว
+
+golangci-lint รองรับ [various linters](https://golangci-lint.run/usage/linters/)
+โดย linters ที่กล่าวมาก่อนหน้านี้คือชุดพื้นฐานที่แนะนำ และเราแนะนำให้แต่ละทีม
+เพิ่มเติม linters ตามความเหมาะสมของโปรเจกต์ตัวเอง เพื่อให้เหมาะกับบริบทของงานและโค้ดที่เขียน

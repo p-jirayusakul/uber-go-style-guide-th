@@ -1864,24 +1864,24 @@ func run() (exitCode int) {
 }
 ```
 
-More generally, note that the `run()` function used in these examples
-is not intended to be prescriptive.
-There's flexibility in the name, signature, and setup of the `run()` function.
-Among other things, you may:
+โดยทั่วไปแล้ว ตัวอย่างที่ใช้ฟังก์ชัน `run()` นั้น ไม่ใช่กฎตายตัว
+คุณสามารถปรับเปลี่ยนชื่อรูปแบบหรือโครงสร้างของ `run()` ได้อย่างยืดหยุ่นตามความเหมาะสม
 
-- accept unparsed command line arguments (e.g., `run(os.Args[1:])`)
-- parse command line arguments in `main()` and pass them onto `run`
-- use a custom error type to carry the exit code back to `main()`
-- put business logic in a different layer of abstraction from `package main`
+- รับอาร์กิวเมนต์จากบรรทัดคำสั่งโดยตรง เช่น `run(os.Args[1:])`
+- ให้ `main()` ทำหน้าที่ parse อาร์กิวเมนต์ แล้วส่งต่อไปยัง `run`
+- ใช้ custom error type เพื่อ แนบ exit code กลับไปยัง `main()`
+- แยก business logic ออกไปอยู่อีกเลเยอร์หนึ่งที่ไม่ใช่ package main
 
-This guidance only requires that there's a single place in your `main()`
-responsible for actually exiting the process.
+**แนวคิดหลักที่แนะนำ**
+
+ให้มีเพียงจุดเดียวใน `main()` ที่มีหน้าที่ “exit โปรแกรม” เท่านั้น
+ไม่ว่าจะเป็น `os.Exit()`, `log.Fatal()` หรืออย่างอื่น
+ส่วน logic อื่น ๆ ให้ return กลับมาให้ `main()` ตัดสินใจว่าโปรแกรมจะหยุดหรือไม่
 
 ### Use field tags in marshaled structs
 
-Any struct field that is marshaled into JSON, YAML,
-or other formats that support tag-based field naming
-should be annotated with the relevant tag.
+ถ้าคุณมี struct ที่จะนำไปแปลง (marshal) เป็น JSON, YAML หรือฟอร์แมตอื่น ๆ ที่รองรับการใช้ tag กำหนดชื่อ field
+ควรกำหนด tag ให้ชัดเจนสำหรับแต่ละ field เพื่อความชัดเจนและปลอดภัยในการเปลี่ยนชื่อในอนาคต
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -1918,37 +1918,38 @@ bytes, err := json.Marshal(Stock{
 </td></tr>
 </tbody></table>
 
-Rationale:
-The serialized form of the structure is a contract between different systems.
-Changes to the structure of the serialized form--including field names--break
-this contract. Specifying field names inside tags makes the contract explicit,
-and it guards against accidentally breaking the contract by refactoring or
-renaming fields.
+เหตุผล:
+
+รูปแบบข้อมูลที่ถูก serialize (เช่น JSON, YAML) จาก struct
+ถือเป็น “ข้อกำหนด” ระหว่างระบบต่าง ๆ
+ไม่ว่าจะเป็นระบบ frontend, backend, API, หรือ third-party service
+
+หากมีการเปลี่ยนแปลงรูปแบบของข้อมูลที่ serialize เช่น การเปลี่ยนชื่อ field
+จะทำให้ข้อกำหนดนี้พัง ซึ่งอาจส่งผลให้ระบบอื่นที่ใช้งานข้อมูลนี้ ทำงานผิดพลาด ได้ทันที
+
+การกำหนดชื่อ field ที่ใช้ในการ serialize ผ่าน tag (เช่น json:"name") จะช่วย:
+* ทำให้ ข้อกำหนดนั้นชัดเจน
+* ป้องกันการเปลี่ยนแปลงโดยไม่ตั้งใจ เช่น การ refactor หรือ rename field
+* ทำให้โค้ดมีความ มั่นคงและปลอดภัยมากขึ้น เมื่อต้องแก้ไขหรือขยายระบบในอนาคต
 
 ### Don't fire-and-forget goroutines
 
-Goroutines are lightweight, but they're not free:
-at minimum, they cost memory for their stack and CPU to be scheduled.
-While these costs are small for typical uses of goroutines,
-they can cause significant performance issues
-when spawned in large numbers without controlled lifetimes.
-Goroutines with unmanaged lifetimes can also cause other issues
-like preventing unused objects from being garbage collected
-and holding onto resources that are otherwise no longer used.
+แม้ว่า Goroutine จะเบาและประหยัดทรัพยากรกว่า thread แต่ก็ ไม่ได้ฟรี
+เพราะทุก Goroutine ต้องใช้หน่วยความจำสำหรับ stack และ CPU สำหรับ scheduling
 
-Therefore, do not leak goroutines in production code.
-Use [go.uber.org/goleak](https://pkg.go.dev/go.uber.org/goleak)
-to test for goroutine leaks inside packages that may spawn goroutines.
+ในหลายกรณี ค่าใช้จ่ายเหล่านี้อาจน้อยมาก
+แต่ถ้า สร้างจำนวนมากโดยไม่มีการจัดการอายุการใช้งาน จะทำให้เกิดปัญหาหนักตามมา เช่น:
+* ปัญหา performance จากการใช้ CPU และหน่วยความจำมากเกินไป
+* หน่วงการเก็บขยะ (GC) เพราะมี Goroutine อ้างอิงถึง object ที่ไม่จำเป็นแล้ว
+* Resource รั่ว เช่น socket, file, memory ที่ไม่ถูกปล่อย
 
-In general, every goroutine:
+ข้อแนะนำ
+* อย่าปล่อยให้ Goroutine รั่วใน production code
+* ใช้ [go.uber.org/goleak](https://pkg.go.dev/go.uber.org/goleak) เพื่อตรวจจับ Goroutine รั่วในการทดสอบ
+* Goroutine ทุกตัวควรมี เวลาในการจบการทำงานที่คาดเดาได้ หรือ ช่องทางให้สามารถสั่งหยุดได้ (เช่น context, channel)
+และในทุกกรณีควรมีวิธี รอให้ Goroutine ทำงานเสร็จ เช่น sync.WaitGroup หรือ <-doneChan
 
-- must have a predictable time at which it will stop running; or
-- there must be a way to signal to the goroutine that it should stop
-
-In both cases, there must be a way code to block and wait for the goroutine to
-finish.
-
-For example:
+ตัวอย่าง:
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -1968,11 +1969,11 @@ go func() {
 
 ```go
 var (
-  stop = make(chan struct{}) // tells the goroutine to stop
-  done = make(chan struct{}) // tells us that the goroutine exited
+  stop = make(chan struct{}) // channel สำหรับสั่งให้ goroutine หยุดทำงาน
+  done = make(chan struct{}) // channel สำหรับบอกว่า goroutine หยุดแล้ว
 )
 go func() {
-  defer close(done)
+  defer close(done) // ปิด channel เมื่อ goroutine จบ
 
   ticker := time.NewTicker(delay)
   defer ticker.Stop()
@@ -1986,72 +1987,66 @@ go func() {
   }
 }()
 
-// Elsewhere...
-close(stop)  // signal the goroutine to stop
-<-done       // and wait for it to exit
+// ในที่อื่นของโปรแกรม...
+close(stop)  // สั่งหยุด goroutine
+<-done       // รอให้ goroutine หยุดก่อนดำเนินการต่อ
 ```
 
 </td></tr>
 <tr><td>
 
-There's no way to stop this goroutine.
-This will run until the application exits.
+Goroutine นี้ไม่มีทางหยุดได้เลย
+มันจะทำงานไปเรื่อย ๆ จนกว่าแอปพลิเคชันจะปิดตัวลงเท่านั้น
 
 </td><td>
 
-This goroutine can be stopped with `close(stop)`,
-and we can wait for it to exit with `<-done`.
+Goroutine นี้สามารถหยุดได้โดยเรียก `close(stop)`
+และเราสามารถรอให้มันหยุดอย่างสมบูรณ์ได้ด้วย `<-done`
 
 </td></tr>
 </tbody></table>
 
 #### Wait for goroutines to exit
 
-Given a goroutine spawned by the system,
-there must be a way to wait for the goroutine to exit.
-There are two popular ways to do this:
+ถ้ามีการสร้าง goroutine ขึ้นมาในระบบ เราควรมีวิธีที่จะรอให้มันหยุดทำงานอย่างเหมาะสม เพื่อป้องกัน resource leak และให้โปรแกรมปิดตัวได้อย่างเป็นระเบียบ
 
-- Use a `sync.WaitGroup`.
-  Do this if there are multiple goroutines that you want to wait for
+- ใช้ `sync.WaitGroup` เหมาะเมื่อเราต้องรอให้ หลาย goroutine ทำงานเสร็จทั้งหมด
 
   ```go
   var wg sync.WaitGroup
   for i := 0; i < N; i++ {
-    wg.Add(1)
+    wg.Add(1) // เพิ่มจำนวน goroutine ที่เราจะรอ
     go func() {
-      defer wg.Done()
+      defer wg.Done() // บอกว่า goroutine นี้เสร็จแล้ว
       // ...
     }()
   }
 
-  // To wait for all to finish:
+  // รอจนกว่าทุก goroutine จะเสร็จ
   wg.Wait()
   ```
 
-- Add another `chan struct{}` that the goroutine closes when it's done.
-  Do this if there's only one goroutine.
+- ถ้ามีแค่ goroutine เดียว ที่เราต้องรอสามารถใช้ channel เปล่า (`chan struct{}`) เพื่อสื่อสารว่ามันทำงานเสร็จแล้ว
 
   ```go
   done := make(chan struct{})
   go func() {
-    defer close(done)
+    defer close(done) // ปิด channel เพื่อส่งสัญญาณว่า goroutine เสร็จแล้ว
     // ...
   }()
 
-  // To wait for the goroutine to finish:
+  // รอให้ goroutine ทำงานเสร็จ
   <-done
   ```
 
 #### No goroutines in `init()`
 
-`init()` functions should not spawn goroutines.
-See also [Avoid init()](#avoid-init).
+ฟังก์ชัน `init()` ไม่ควรสร้าง goroutine (ดูเพิ่มเติมที่หัวข้อ [Avoid init()](#avoid-init))
 
-If a package has need of a background goroutine,
-it must expose an object that is responsible for managing a goroutine's
-lifetime.
-The object must provide a method (`Close`, `Stop`, `Shutdown`, etc)
-that signals the background goroutine to stop, and waits for it to exit.
+หาก package จำเป็นต้องมี background goroutine
+ควร expose object ที่รับผิดชอบในการจัดการ lifetime ของ goroutine นั้นโดยเฉพาะ
+object นี้ต้องมีเมธอด เช่น `Close`, `Stop` หรือ `Shutdown`
+เพื่อให้สามารถ ส่งสัญญาณให้ goroutine หยุดทำงาน และ รอจน goroutine หยุดจริง ก่อนจะคืนค่ากลับมา
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2093,8 +2088,8 @@ func (w *Worker) doWork() {
   }
 }
 
-// Shutdown tells the worker to stop
-// and waits until it has finished.
+// Shutdown ใช้สำหรับสั่งให้ worker หยุดทำงาน
+// และรอจนแน่ใจว่า worker หยุดแล้วจริง ๆ
 func (w *Worker) Shutdown() {
   close(w.stop)
   <-w.done
@@ -2104,30 +2099,29 @@ func (w *Worker) Shutdown() {
 </td></tr>
 <tr><td>
 
-Spawns a background goroutine unconditionally when the user exports this package.
-The user has no control over the goroutine or a means of stopping it.
+โค้ดนี้จะ สร้าง goroutine ทำงานเบื้องหลังแบบไม่มีเงื่อนไข ทันทีที่ผู้ใช้ import package นี้
+ผู้ใช้ไม่สามารถควบคุมการทำงานของ goroutine ได้เลย และก็ไม่มีทางหยุดมันด้วย
 
 </td><td>
 
-Spawns the worker only if the user requests it.
-Provides a means of shutting down the worker so that the user can free up
-resources used by the worker.
+โค้ดนี้จะ สร้าง worker ก็ต่อเมื่อผู้ใช้เรียกใช้งานโดยตรง
+และยังมีช่องทางให้หยุดการทำงานของ worker อย่างปลอดภัย
+ทำให้ผู้ใช้สามารถคืน resource ที่ใช้โดย worker ได้อย่างเหมาะสม
 
-Note that you should use `WaitGroup`s if the worker manages multiple
-goroutines.
-See [Wait for goroutines to exit](#wait-for-goroutines-to-exit).
+หมายเหตุ: ถ้า worker ตัวเดียวจัดการหลาย goroutine ควรใช้ sync.WaitGroup เพื่อรอให้ทุก goroutine หยุดก่อนจริง ๆ
+ดูหัวข้อ [Wait for goroutines to exit](#wait-for-goroutines-to-exit) ประกอบด้วยครับ
 
 </td></tr>
 </tbody></table>
 
 ## Performance
 
-Performance-specific guidelines apply only to the hot path.
+แนวทางในหัวข้อนี้เน้นเฉพาะ ส่วนที่มีการใช้งานหนักเท่านั้น
 
 ### Prefer strconv over fmt
 
-When converting primitives to/from strings, `strconv` is faster than
-`fmt`.
+เมื่อคุณต้องการแปลงค่าประเภทพื้นฐาน (primitive) เป็น string หรือแปลงกลับ
+ควรใช้แพ็กเกจ `strconv` เพราะ ทำงานเร็วกว่า `fmt`
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2166,8 +2160,8 @@ BenchmarkStrconv-4    64.2 ns/op    1 allocs/op
 
 ### Avoid repeated string-to-byte conversions
 
-Do not create byte slices from a fixed string repeatedly. Instead, perform the
-conversion once and capture the result.
+อย่าสร้าง slice ของ byte ([]byte) จาก string ค่าคงที่แบบซ้ำ ๆ ในหลาย ๆ จุดของโค้ด
+ให้แปลงเพียงครั้งเดียว แล้วเก็บค่าไว้ใช้งานภายหลัง
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2207,27 +2201,24 @@ BenchmarkGood-4  500000000   3.25 ns/op
 
 ### Prefer Specifying Container Capacity
 
-Specify container capacity where possible in order to allocate memory for the
-container up front. This minimizes subsequent allocations (by copying and
-resizing of the container) as elements are added.
+ควรกำหนดความจุของ container (เช่น slice หรือ map) ให้ชัดเจนเมื่อเป็นไปได้
+เพื่อให้ระบบสามารถจัดสรรหน่วยความจำล่วงหน้า ลดการจัดสรรเพิ่มเติมในอนาคต
+(ซึ่งจะเกิดการ copy และขยาย container เมื่อมีการเพิ่มข้อมูล)
 
 #### Specifying Map Capacity Hints
 
-Where possible, provide capacity hints when initializing
-maps with `make()`.
+เมื่อเป็นไปได้ ควรระบุขนาดโดยประมาณ ตอนที่สร้าง `map` ด้วย `make()`
 
 ```go
 make(map[T1]T2, hint)
 ```
 
-Providing a capacity hint to `make()` tries to right-size the
-map at initialization time, which reduces the need for growing
-the map and allocations as elements are added to the map.
+การระบุขนาดนี้ช่วยให้ Go สามารถจัดสรร bucket ของ hashmap ได้ใกล้เคียงกับขนาดที่ต้องการตั้งแต่เริ่มต้น
+ซึ่งจะช่วยลดความจำเป็นในการขยาย map และลดจำนวนครั้งที่ต้องจัดสรรหน่วยความจำเพิ่มเติมเมื่อมีการเพิ่มข้อมูลเข้าไป
 
-Note that, unlike slices, map capacity hints do not guarantee complete,
-preemptive allocation, but are used to approximate the number of hashmap buckets
-required. Consequently, allocations may still occur when adding elements to the
-map, even up to the specified capacity.
+อย่างไรก็ตาม ต่างจาก slice, การระบุขนาดของ `map` ไม่รับประกัน ว่าจะมีการจัดสรรหน่วยความจำทั้งหมดล่วงหน้า
+แต่มันเป็นเพียงการ “ประมาณ” จำนวน bucket ที่ต้องใช้ ดังนั้นการเพิ่มข้อมูลเข้าไปใน map
+ยังคงอาจทำให้เกิดการจัดสรรเพิ่มเติมได้ แม้จะยังไม่เกินขนาดที่ระบุไว้ก็ตาม
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2258,31 +2249,24 @@ for _, f := range files {
 </td></tr>
 <tr><td>
 
-`m` is created without a size hint; there may be more
-allocations at assignment time.
+สร้าง `m` โดยไม่ระบุขนาดเริ่มต้น อาจทำให้เกิดการจัดสรรหน่วยความจำเพิ่มเติมบ่อยครั้งในระหว่างการใส่ข้อมูล
 
 </td><td>
 
-`m` is created with a size hint; there may be fewer
-allocations at assignment time.
+สร้าง `m` โดยระบุขนาดเริ่มต้น ช่วยลดจำนวนครั้งที่ต้องจัดสรรหน่วยความจำในระหว่างการใส่ข้อมูลลงใน `map` ได้
 
 </td></tr>
 </tbody></table>
 
 #### Specifying Slice Capacity
 
-Where possible, provide capacity hints when initializing slices with `make()`,
-particularly when appending.
+ในกรณีที่สามารถคาดการณ์จำนวนของข้อมูลล่วงหน้าได้ ควรระบุ capacity ไว้ตอนสร้าง slice ด้วย `make()` โดยเฉพาะในกรณีที่มีการใช้ append() บ่อย ๆ
 
 ```go
 make([]T, length, capacity)
 ```
 
-Unlike maps, slice capacity is not a hint: the compiler will allocate enough
-memory for the capacity of the slice as provided to `make()`, which means that
-subsequent `append()` operations will incur zero allocations (until the length
-of the slice matches the capacity, after which any appends will require a resize
-to hold additional elements).
+ต่างจาก map ตรงที่ capacity ของ slice ไม่ใช่แค่คำใบ้: ตัวคอมไพเลอร์จะจัดสรรหน่วยความจำตามความจุที่ระบุไว้ทันที ซึ่งหมายความว่า การ `append()` จะไม่ต้องจัดสรรหน่วยความจำเพิ่มเติมเลย (ตราบใดที่ความยาวของ slice ยังไม่เกินความจุที่กำหนดไว้) แต่เมื่อเกินแล้ว ระบบจะต้องจัดสรรใหม่เพื่อรองรับข้อมูลที่เพิ่มเข้ามาอีก.
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2329,37 +2313,25 @@ BenchmarkGood-4   100000000    0.21s
 
 ### Avoid overly long lines
 
-Avoid lines of code that require readers to scroll horizontally
-or turn their heads too much.
+พยายามอย่าเขียนโค้ดในบรรทัดเดียวจนยาวเกินไป จนผู้อ่านต้องเลื่อนจอแนวนอน หรือเอียงศีรษะเพื่ออ่าน
 
-We recommend a soft line length limit of **99 characters**.
-Authors should aim to wrap lines before hitting this limit,
-but it is not a hard limit.
-Code is allowed to exceed this limit.
+แนะนำให้จำกัดความยาวของบรรทัดแบบ soft limit ไว้ที่ **99 ตัวอักษร** — หมายความว่าควรพยายามห่อบรรทัดก่อนถึงจุดนี้ แต่ไม่ใช่ข้อบังคับตายตัว ถ้ามีเหตุผลเหมาะสมก็สามารถเขียนเกินได้.
 
 ### Be Consistent
 
-Some of the guidelines outlined in this document can be evaluated objectively;
-others are situational, contextual, or subjective.
+แนวทางต่าง ๆ ที่ระบุไว้ในเอกสารนี้ บางข้อสามารถประเมินได้อย่างชัดเจน แต่บางข้อก็ขึ้นอยู่กับสถานการณ์ บริบท หรือดุลยพินิจ
 
-Above all else, **be consistent**.
+เหนือสิ่งอื่นใด **ควรรักษาความสม่ำเสมอ**
 
-Consistent code is easier to maintain, is easier to rationalize, requires less
-cognitive overhead, and is easier to migrate or update as new conventions emerge
-or classes of bugs are fixed.
+โค้ดที่มีรูปแบบสม่ำเสมอจะดูแลรักษาได้ง่ายกว่า เข้าใจได้ง่ายกว่า ใช้พลังสมองน้อยกว่า และง่ายต่อการปรับปรุงหรือย้ายไปใช้แนวทางใหม่เมื่อมาตรฐานเปลี่ยนแปลง หรือเมื่อต้องแก้ปัญหาที่คล้ายกันในวงกว้าง
 
-Conversely, having multiple disparate or conflicting styles within a single
-codebase causes maintenance overhead, uncertainty, and cognitive dissonance,
-all of which can directly contribute to lower velocity, painful code reviews,
-and bugs.
+ในทางกลับกัน หากใน codebase เดียวกันมีหลายรูปแบบปะปนหรือขัดแย้งกัน จะทำให้เกิดภาระในการดูแล รู้สึกลังเล และเกิดความสับสน ซึ่งทั้งหมดนี้ส่งผลต่อความเร็วในการพัฒนา ความยากลำบากในการรีวิวโค้ด และการเกิดบั๊กโดยตรง
 
-When applying these guidelines to a codebase, it is recommended that changes
-are made at a package (or larger) level: application at a sub-package level
-violates the above concern by introducing multiple styles into the same code.
+เมื่อจะนำแนวทางเหล่านี้ไปปรับใช้ใน codebase แนะนำให้ทำในระดับแพ็กเกจ (package) หรือมากกว่านั้น เพราะถ้าทำแค่ระดับย่อยกว่านั้น (sub-package) จะย้อนแย้งกับหลักการข้างต้น และยิ่งทำให้มีหลายรูปแบบในระบบเดียวกัน
 
 ### Group Similar Declarations
 
-Go supports grouping similar declarations.
+Go รองรับการจัดกลุ่มคำประกาศประเภทเดียวกันให้ดูเรียบร้อยและอ่านง่ายขึ้น
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2383,7 +2355,7 @@ import (
 </td></tr>
 </tbody></table>
 
-This also applies to constants, variables, and type declarations.
+ข้อนี้ใช้ได้กับการประกาศ constants, variables, และ type ด้วยเช่นกัน
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2428,7 +2400,7 @@ type (
 </td></tr>
 </tbody></table>
 
-Only group related declarations. Do not group declarations that are unrelated.
+ควรจัดกลุ่มเฉพาะการประกาศที่เกี่ยวข้องกันเท่านั้น อย่าจัดกลุ่มการประกาศที่ไม่เกี่ยวข้องกัน
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2498,9 +2470,7 @@ func f() string {
 </td></tr>
 </tbody></table>
 
-Exception: Variable declarations, particularly inside functions, should be
-grouped together if declared adjacent to other variables. Do this for variables
-declared together even if they are unrelated.
+แม้ว่าหลักการทั่วไปจะให้จัดกลุ่มเฉพาะตัวแปรที่เกี่ยวข้องกัน แต่ ในกรณีที่ตัวแปรหลายตัวถูกประกาศอยู่ติดกันในฟังก์ชัน (แม้จะไม่เกี่ยวข้องกันโดยตรง) ก็ควรจัดกลุ่มไว้ด้วยกันเพื่อความเป็นระเบียบและอ่านง่าย
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2538,12 +2508,12 @@ func (c *client) request() {
 
 ### Import Group Ordering
 
-There should be two import groups:
+ควรมี สองกลุ่ม สำหรับ import
 
-- Standard library
-- Everything else
+- Standard library – เช่น "fmt", "net/http", "time" ฯลฯ
+- ทุกอย่างอื่น – ได้แก่ third-party libraries ("go.uber.org/zap", "github.com/pkg/errors") หรือ internal packages ของโปรเจกต์เอง
 
-This is the grouping applied by goimports by default.
+การจัดกลุ่มแบบนี้เป็น ค่าเริ่มต้นที่ goimports ใช้ และช่วยให้โค้ดอ่านง่ายและมีมาตรฐานเดียวกัน
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2576,40 +2546,37 @@ import (
 
 ### Package Names
 
-When naming packages, choose a name that is:
+เมื่อตั้งชื่อ package ควรยึดตามแนวทางดังนี้:
 
-- All lower-case. No capitals or underscores.
-- Does not need to be renamed using named imports at most call sites.
-- Short and succinct. Remember that the name is identified in full at every call
-  site.
-- Not plural. For example, `net/url`, not `net/urls`.
-- Not "common", "util", "shared", or "lib". These are bad, uninformative names.
+- ช้ตัวพิมพ์เล็กทั้งหมด – หลีกเลี่ยงการใช้ตัวพิมพ์ใหญ่หรือ _ (underscore)
+- ไม่ควรต้องมีการเปลี่ยนชื่อเมื่อ import – ควรสามารถใช้ชื่อ package ได้ตรง ๆ โดยไม่ต้องทำ named import
+- สั้นและชัดเจน – เพราะชื่อ package จะถูกใช้ซ้ำในทุกจุดที่เรียกใช้ เช่น log.Info()
+- อย่าใช้พหูพจน์ – เช่น ใช้ net/url แทน net/urls
+- หลีกเลี่ยงชื่อทั่วไปที่ไม่สื่อความหมาย – เช่น common, util, shared, หรือ lib เพราะไม่บอกว่าภายในทำอะไร
 
-See also [Package Names](https://go.dev/blog/package-names) and [Style guideline for Go packages](https://rakyll.org/style-packages/).
+ดูเพิ่มเติม [Package Names](https://go.dev/blog/package-names) and [Style guideline for Go packages](https://rakyll.org/style-packages/).
 
 ### Function Names
 
-We follow the Go community's convention of using [MixedCaps for function
-names](https://go.dev/doc/effective_go#mixed-caps). An exception is made for test functions, which may contain underscores
-for the purpose of grouping related test cases, e.g.,
-`TestMyFunction_WhatIsBeingTested`.
+Go แนะนำให้ใช้ รูปแบบตัวพิมพ์ผสม ([MixedCaps for function
+names](https://go.dev/doc/effective_go#mixed-caps)) เช่น DoSomething, handleRequest
+ยกเว้นกรณีพิเศษสำหรับฟังก์ชันทดสอบ (test functions) ที่สามารถใช้ _ เพื่อแยกกลุ่มเคสที่เกี่ยวข้องกันได้ เช่น: `TestMyFunction_WhatIsBeingTested`
 
 ### Import Aliasing
 
-Import aliasing must be used if the package name does not match the last
-element of the import path.
+ควรใช้ alias ก็ต่อเมื่อชื่อ package ไม่ตรงกับชื่อท้ายของ path:
 
 ```go
 import (
   "net/http"
 
-  client "example.com/client-go"
-  trace "example.com/trace/v2"
+  client "example.com/client-go" // ชื่อจริงของ package อาจไม่ใช่ "client"
+  trace "example.com/trace/v2" // ใช้ alias เพื่อชัดเจน
 )
 ```
 
-In all other scenarios, import aliases should be avoided unless there is a
-direct conflict between imports.
+ในกรณีอื่น ๆ ทั้งหมด ไม่ควรใช้ alias ตอน import
+เว้นแต่ว่าจะเกิด ชื่อซ้ำกันโดยตรงระหว่างหลาย package
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2643,17 +2610,14 @@ import (
 
 ### Function Grouping and Ordering
 
-- Functions should be sorted in rough call order.
-- Functions in a file should be grouped by receiver.
+- ควรจัดลำดับฟังก์ชันให้สอดคล้องกับ ลำดับการเรียกใช้งานโดยคร่าว ๆ
+- ควรจัดกลุ่มฟังก์ชันตาม receiver (เช่น func (s *Server) Serve() ควรอยู่รวมกัน)
 
-Therefore, exported functions should appear first in a file, after
-`struct`, `const`, `var` definitions.
-
-A `newXYZ()`/`NewXYZ()` may appear after the type is defined, but before the
-rest of the methods on the receiver.
-
-Since functions are grouped by receiver, plain utility functions should appear
-towards the end of the file.
+ดังนั้น:
+* ฟังก์ชันที่ exported (เช่น ฟังก์ชันขึ้นต้นด้วยตัวพิมพ์ใหญ่) ควรอยู่ ตอนต้นของไฟล์
+* ให้ตามหลังจาก `struct`, `const`, `var` ที่เกี่ยวข้อง
+* ฟังก์ชัน `newXYZ()` หรือ `NewXYZ()` ควรอยู่หลัง type ที่เกี่ยวข้อง และ ก่อน methods อื่นของ receiver นั้น
+* ฟังก์ชันแบบ utility ที่ไม่มี receiver ควรอยู่ ท้ายไฟล์
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2699,9 +2663,9 @@ func calcCost(n []int) int {...}
 
 ### Reduce Nesting
 
-Code should reduce nesting where possible by handling error cases/special
-conditions first and returning early or continuing the loop. Reduce the amount
-of code that is nested multiple levels.
+ควรเขียนโค้ดให้ ลดระดับการซ้อนให้น้อยที่สุด โดยเฉพาะเมื่อมีเงื่อนไขพิเศษหรือการตรวจสอบ error:
+* ให้ จัดการกรณีพิเศษ หรือ error ก่อน แล้ว return หรือ continue ทันที
+* โค้ดหลักควรอยู่ในระดับที่ไม่ถูกซ้อนหลายชั้น เพื่อให้อ่านง่ายและเข้าใจได้เร็ว
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2745,8 +2709,7 @@ for _, v := range data {
 
 ### Unnecessary Else
 
-If a variable is set in both branches of an if, it can be replaced with a
-single if.
+ถ้าโค้ดในทั้งสองฝั่งของ if และ else ทำเพียงแค่การกำหนดค่าให้กับตัวแปรเดียวกัน — เราสามารถเขียนให้ง่ายและอ่านสบายขึ้นโดยไม่ต้องใช้ else
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2776,8 +2739,7 @@ if b {
 
 ### Top-level Variable Declarations
 
-At the top level, use the standard `var` keyword. Do not specify the type,
-unless it is not the same type as the expression.
+ในการประกาศตัวแปรระดับบนสุดของ package (นอกฟังก์ชัน), ให้ใช้คีย์เวิร์ด `var` ตามรูปแบบมาตรฐาน และ ไม่ต้องระบุชนิดของตัวแปร เว้นแต่ชนิดของค่าที่กำหนดไว้ต่างจากชนิดของตัวแปร
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2794,8 +2756,8 @@ func F() string { return "A" }
 
 ```go
 var _s = F()
-// Since F already states that it returns a string, we don't need to specify
-// the type again.
+// เนื่องจาก F ระบุไว้อยู่แล้วว่า return ค่าเป็น string
+// จึงไม่จำเป็นต้องระบุชนิดตัวแปรซ้ำอีก
 
 func F() string { return "A" }
 ```
@@ -2803,8 +2765,7 @@ func F() string { return "A" }
 </td></tr>
 </tbody></table>
 
-Specify the type if the type of the expression does not match the desired type
-exactly.
+ให้ระบุชนิดของตัวแปร ชัดเจนในกรณีที่ชนิดของค่าที่คืนจาก expression ไม่ตรงกับชนิดที่เราต้องการเป๊ะ ๆ
 
 ```go
 type myError struct{}
@@ -2814,17 +2775,18 @@ func (myError) Error() string { return "error" }
 func F() myError { return myError{} }
 
 var _e error = F()
-// F returns an object of type myError but we want error.
+// F คืนค่าเป็น myError (ซึ่ง implement interface error)
+// แต่เราต้องการตัวแปรที่เป็นชนิด error
 ```
 
 ### Prefix Unexported Globals with _
 
-Prefix unexported top-level `var`s and `const`s with `_` to make it clear when
-they are used that they are global symbols.
+ควรเติม prefix `_` นำหน้าชื่อตัวแปร (`var`) หรือค่าคงที่ (`const`) ที่อยู่ระดับ top-level และ ไม่ export (ชื่อขึ้นต้นด้วยตัวพิมพ์เล็ก) เพื่อให้เห็นชัดว่าเป็น symbol ที่อยู่ระดับ global
 
-Rationale: Top-level variables and constants have a package scope. Using a
-generic name makes it easy to accidentally use the wrong value in a different
-file.
+เหตุผล:
+* ตัวแปรหรือค่าคงที่ที่ประกาศระดับ top-level มี package scope
+* ถ้าตั้งชื่อทั่วไปเกินไป เช่น version, timeout, config โดยไม่มี `_` นำหน้า จะทำให้ อาจสับสนกับตัวแปรในไฟล์อื่น ที่อยู่ใน package เดียวกัน
+* การเติม `_` จะช่วยให้เห็นชัดว่าเป็น global symbol ไม่ใช่ local หรือ temporary
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -2865,15 +2827,12 @@ const (
 </td></tr>
 </tbody></table>
 
-**Exception**: Unexported error values may use the prefix `err` without the underscore.
-See [Error Naming](#error-naming).
+**ข้อยกเว้น**: ค่าตัวแปร error ที่ไม่ export สามารถใช้ prefix err ได้โดยไม่ต้องเติม `_` นำหน้า
+ดูรายละเอียดเพิ่มเติมที่หัวข้อ [Error Naming](#error-naming)
 
 ### Embedding in Structs
 
-Embedded types should be at the top of the field list of a
-struct, and there must be an empty line separating embedded fields from regular
-fields.
-
+ถ้าจะใช้ embedded types (ประเภทที่ฝังไว้ใน struct) ควรวางไว้ที่ด้านบนสุดของรายการ field ภายใน struct และ ต้องเว้นบรรทัดว่าง คั่นระหว่าง embedded fields กับ fields ปกติ
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
 <tbody>
@@ -2899,33 +2858,30 @@ type Client struct {
 </td></tr>
 </tbody></table>
 
-Embedding should provide tangible benefit, like adding or augmenting
-functionality in a semantically-appropriate way. It should do this with zero
-adverse user-facing effects (see also: [Avoid Embedding Types in Public Structs](#avoid-embedding-types-in-public-structs)).
+การฝัง (Embedding) ควรนำมาซึ่งประโยชน์ที่จับต้องได้ เช่น เพิ่มหรือขยายฟังก์ชันการทำงานของ struct อย่างเหมาะสมทางความหมาย และต้องไม่มีผลกระทบด้านลบต่อผู้ใช้งาน (ดูเพิ่มเติมใน [Avoid Embedding Types in Public Structs](#avoid-embedding-types-in-public-structs))
 
-Exception: Mutexes should not be embedded, even on unexported types. See also: [Zero-value Mutexes are Valid](#zero-value-mutexes-are-valid).
+ข้อยกเว้น: ไม่ควร embed `sync.Mutex` แม้ใน struct ที่ไม่ export ดูเพิ่มเติมที่หัวข้อ: [Zero-value Mutexes are Valid](#zero-value-mutexes-are-valid).
 
-Embedding **should not**:
+ห้ามฝัง Type เพื่อเหตุผลเหล่านี้:
 
-- Be purely cosmetic or convenience-oriented.
-- Make outer types more difficult to construct or use.
-- Affect outer types' zero values. If the outer type has a useful zero value, it
-  should still have a useful zero value after embedding the inner type.
-- Expose unrelated functions or fields from the outer type as a side-effect of
-  embedding the inner type.
-- Expose unexported types.
-- Affect outer types' copy semantics.
-- Change the outer type's API or type semantics.
-- Embed a non-canonical form of the inner type.
-- Expose implementation details of the outer type.
-- Allow users to observe or control type internals.
-- Change the general behavior of inner functions through wrapping in a way that
-  would reasonably surprise users.
+* เพื่อความสะดวก หรือความสวยงาม โดยไม่มีประโยชน์ที่แท้จริง
+* ทำให้การสร้างหรือนำ struct มาใช้งานยุ่งยากขึ้น
+* ทำให้ zero value ของ struct ภายนอกหมดความหมายหรือใช้การไม่ได้
+* ทำให้มีฟังก์ชันหรือ field ที่ไม่เกี่ยวข้องโผล่ขึ้นมาจาก struct ด้านนอกโดยไม่ตั้งใจ
+* ทำให้ type ภายในที่ไม่ export ถูกเปิดเผย
+* เปลี่ยนพฤติกรรมการคัดลอก (copy semantics) ของ struct ภายนอก
+* เปลี่ยน API หรือ semantic ของ type ภายนอก
+* ฝัง type ที่ไม่ใช่รูปแบบหลักของ type นั้น (non-canonical form)
+* เปิดเผยรายละเอียดของการ implement ภายใน struct
+* ทำให้ผู้ใช้สามารถมองเห็นหรือควบคุมสิ่งที่ควรถูกซ่อนไว้ใน type
+* เปลี่ยนพฤติกรรมของฟังก์ชันภายในอย่างที่อาจทำให้ผู้ใช้สับสน
 
-Simply put, embed consciously and intentionally. A good litmus test is, "would
-all of these exported inner methods/fields be added directly to the outer type";
-if the answer is "some" or "no", don't embed the inner type - use a field
-instead.
+พูดง่าย ๆ ก็คือ: ให้ฝัง (embed) อย่างมีสติและตั้งใจจริงเท่านั้น
+
+แนวทางเช็คง่าย ๆ คือ:
+ถ้าเราจะเพิ่ม method หรือ field ที่ export ทั้งหมดของ type ด้านในเข้าไปที่ type ด้านนอกโดยตรง — เรายินดีจะทำแบบนั้นทั้งหมดไหม?
+* ถ้าคำตอบคือ “บางอันเท่านั้น” หรือ “ไม่เลย” → อย่า embed type นั้น
+* แต่ให้ใช้เป็น field แบบปกติแทน เพื่อหลีกเลี่ยงผลกระทบที่ไม่ตั้งใจต่อ API และการใช้งานของ type ด้านนอก.
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3027,8 +2983,7 @@ type Client struct {
 
 ### Local Variable Declarations
 
-Short variable declarations (`:=`) should be used if a variable is being set to
-some value explicitly.
+การประกาศตัวแปรแบบย่อด้วย `:=` ควรใช้เมื่อคุณกำหนดค่าให้ตัวแปรอย่างชัดเจน
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3048,8 +3003,8 @@ s := "foo"
 </td></tr>
 </tbody></table>
 
-However, there are cases where the default value is clearer when the `var`
-keyword is used. [Declaring Empty Slices](https://go.dev/wiki/CodeReviewComments#declaring-empty-slices), for example.
+อย่างไรก็ตาม ก็มีบางกรณีที่การใช้ `var` จะช่วยให้โค้ดดูชัดเจนขึ้นกว่าใช้ `:=` โดยเฉพาะในกรณีที่ต้องการสื่อว่าเป็นค่าเริ่มต้น (default value)
+ตัวอย่างเช่น [Declaring Empty Slices](https://go.dev/wiki/CodeReviewComments#declaring-empty-slices)
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3085,10 +3040,10 @@ func f(list []int) {
 
 ### nil is a valid slice
 
-`nil` is a valid slice of length 0. This means that,
+nil ถือว่าเป็น slice ที่ถูกต้อง และมีความยาวเป็น 0 `(len(s) == 0)`
+ดังนั้น คำแนะนำคือ
 
-- You should not return a slice of length zero explicitly. Return `nil`
-  instead.
+- ไม่ควร return slice ว่าง `([]T{})` โดยเจตนาควร `return nil` แทน เมื่อไม่มีข้อมูล
 
   <table>
   <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3112,8 +3067,7 @@ func f(list []int) {
   </td></tr>
   </tbody></table>
 
-- To check if a slice is empty, always use `len(s) == 0`. Do not check for
-  `nil`.
+- เพื่อเช็กว่า slice ว่างหรือไม่ ให้ใช้ `len(s) == 0` เสมอ อย่าใช้ `s == nil` ในการตรวจสอบความว่างของ slice
 
   <table>
   <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3137,8 +3091,7 @@ func f(list []int) {
   </td></tr>
   </tbody></table>
 
-- The zero value (a slice declared with `var`) is usable immediately without
-  `make()`.
+- ค่าศูนย์ของ slice (เช่น slice ที่ประกาศด้วย `var`) สามารถใช้งานได้ทันที โดยไม่ต้องใช้ `make()`
 
   <table>
   <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3147,7 +3100,7 @@ func f(list []int) {
 
   ```go
   nums := []int{}
-  // or, nums := make([]int)
+  // หรือ nums := make([]int)
 
   if add1 {
     nums = append(nums, 1)
@@ -3175,14 +3128,19 @@ func f(list []int) {
   </td></tr>
   </tbody></table>
 
-Remember that, while it is a valid slice, a nil slice is not equivalent to an
-allocated slice of length 0 - one is nil and the other is not - and the two may
-be treated differently in different situations (such as serialization).
+อย่าลืมว่า ถึงแม้ nil slice จะเป็น slice ที่ถูกต้อง แต่ก็ ไม่เหมือนกับ slice ที่ถูก allocate แล้วแต่มีความยาวเป็น 0 — อันหนึ่งคือ nil ส่วนอีกอันไม่ใช่ nil — ซึ่งทั้งสองแบบอาจถูกจัดการแตกต่างกันในบางสถานการณ์ เช่น การทำ serialization
+
+```go
+var a []int        // nil slice
+b := []int{}       // empty but non-nil slice
+
+fmt.Println(a == nil) // true
+fmt.Println(b == nil) // false
+```
 
 ### Reduce Scope of Variables
 
-Where possible, reduce scope of variables and constants. Do not reduce the scope if it
-conflicts with [Reduce Nesting](#reduce-nesting).
+การลดขอบเขตของตัวแปร (variable scope) ช่วยให้โค้ดอ่านง่ายและเข้าใจง่ายขึ้น โดยควรทำ เมื่อเป็นไปได้ และไม่ขัดแย้งกับหลักการ [Reduce Nesting](#reduce-nesting)
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3207,8 +3165,7 @@ if err := os.WriteFile(name, data, 0644); err != nil {
 </td></tr>
 </tbody></table>
 
-If you need a result of a function call outside of the if, then you should not
-try to reduce the scope.
+ถ้าคุณจำเป็นต้องใช้ผลลัพธ์จากการเรียกฟังก์ชัน นอกเงื่อนไข if, ไม่ควรลดขอบเขตของตัวแปร เพราะจะทำให้โค้ดอ่านยากขึ้นและมีโครงสร้างซับซ้อนโดยไม่จำเป็น
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3248,8 +3205,7 @@ return nil
 </td></tr>
 </tbody></table>
 
-Constants do not need to be global unless they are used in multiple functions or files
-or are part of an external contract of the package.
+หลักการ: ค่าคงที่ (constants) ไม่จำเป็นต้องเป็น global หากใช้เฉพาะภายในฟังก์ชันเดียว
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3284,8 +3240,8 @@ func Bar() {
 
 ### Avoid Naked Parameters
 
-Naked parameters in function calls can hurt readability. Add C-style comments
-(`/* ... */`) for parameter names when their meaning is not obvious.
+การส่งพารามิเตอร์แบบเปล่า ๆ ในฟังก์ชัน (โดยไม่มีคำอธิบาย) อาจทำให้ผู้อ่านโค้ดสับสนหรือเข้าใจผิดได้
+หากความหมายของพารามิเตอร์ไม่ชัดเจน ควรเพิ่มคอมเมนต์แบบ C (`/* ... */`) เพื่อบอกชื่อพารามิเตอร์
 
 <table>
 <thead><tr><th>Bad</th><th>Good</th></tr></thead>
@@ -3309,9 +3265,9 @@ printInfo("foo", true /* isLocal */, true /* done */)
 </td></tr>
 </tbody></table>
 
-Better yet, replace naked `bool` types with custom types for more readable and
-type-safe code. This allows more than just two states (true/false) for that
-parameter in the future.
+ดียิ่งกว่านั้น: ให้หลีกเลี่ยงการใช้ `bool` แบบเปล่า ๆ โดยการสร้าง custom type ขึ้นมาแทน
+เพื่อให้โค้ดอ่านง่ายขึ้นและปลอดภัยจากความผิดพลาดด้าน type
+นอกจากนี้ยังสามารถขยายตัวเลือกให้มากกว่าแค่ true/false ได้ในอนาคต
 
 ```go
 type Region int
@@ -3326,7 +3282,7 @@ type Status int
 const (
   StatusReady Status = iota + 1
   StatusDone
-  // Maybe we will have a StatusInProgress in the future.
+  // ในอนาคตอาจมีสถานะใหม่เพิ่ม เช่น StatusInProgress
 )
 
 func printInfo(name string, region Region, status Status)
